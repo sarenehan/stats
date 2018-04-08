@@ -1,0 +1,7 @@
+*/data/*
+/bin/
+/lib/
+/share/
+pip-selfcheck.json
+pyvenv.cfg
+.DS_Store

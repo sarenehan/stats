@@ -1,0 +1,6 @@
+[
+   {
+      "Path" : "s3://stat-538/install_python_packages.sh",
+      "Name" : "Install python packages"
+   }
+]

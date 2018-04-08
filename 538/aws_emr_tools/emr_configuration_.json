@@ -1,0 +1,29 @@
+[
+    {
+        "Classification": "spark-env",
+        "Configurations": [
+                {
+                    "Classification": "export",
+                    "Properties": {
+                        "maximizeResourceAllocation": "true",
+                        "PYSPARK_PYTHON": "/usr/bin/python3"
+                    }
+                }
+            ]
+    },
+    {
+        "Classification": "spark-defaults",
+        "Properties": {
+            "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+            "spark.shuffle.service.enabled": "true",
+            "spark.dynamicAllocation.enabled": "true",
+            "spark.kryoserializer.buffer.max": "1G"
+        }
+    },
+    {
+        "Classification": "yarn-env",
+        "Properties": {
+            "yarn.nodemanager.vmem-check-enabled": "true"
+        }
+    }
+]
