@@ -1,0 +1,3 @@
+walrus==0.5.1
+Cython==0.28.1
+pycocotools==2.0.0

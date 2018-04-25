@@ -1,7 +1,6 @@
 import torch
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
-import numpy as np
 
 
 def discontinuous_func(x):

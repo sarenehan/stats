@@ -1,0 +1,1 @@
+sudo scp -r -i ~/.ssh/stats.pem ~/projects/stats/548/ ubuntu@ec2-34-216-220-59.us-west-2.compute.amazonaws.com:~/
