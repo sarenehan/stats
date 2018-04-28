@@ -1,6 +1,6 @@
 import torch
 from torch.autograd import Variable
-from utils.coco_utils import load_data
+from utils.coco_utils import load_data_small_supercategory
 from utils.redis_utils import cache
 from homework_1.hw1_graphs import draw_error_over_time
 import torch.nn.functional as F
@@ -11,11 +11,16 @@ def predict(x_data, w1, w2):
     return layer_one_out.matmul(w2)
 
 
-def compute_error(x_data, y_data, w1, w2):
+def compute_total_error(x_data, y_data, w1, w2):
     y_hat = predict(x_data, w1, w2)
     return (1 / x_data.size()[0]) * (
         0.5 * (y_data - y_hat).pow(2)
     ).sum()
+
+
+def compute_error(x, y, w1, w2):
+    pred = F.relu(x.matmul(w1)).matmul(w2)
+    return 0.5 * (pred - y).pow(2)
 
 
 def get_misclassification_error(x_data, y_data, w1, w2):
@@ -38,11 +43,10 @@ def initialize_weights(d, h):
     return w1, w2
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def train_mlp(n_hidden_layers, training_rate, stopping_criterion):
-    x_data, y_data = load_data('train2014')
-    x_test, y_test = load_data('test2014')
-    x_val, y_val = load_data('val2014')
+    x_data, y_data = load_data_small_supercategory('train2014')
+    x_test, y_test = load_data_small_supercategory('test2014')
+    x_val, y_val = load_data_small_supercategory('val2014')
     d = len(x_data[0])
     x_data = Variable(torch.from_numpy(x_data), requires_grad=True)
     y_data = Variable(torch.from_numpy(y_data).float(), requires_grad=True)
@@ -60,25 +64,29 @@ def train_mlp(n_hidden_layers, training_rate, stopping_criterion):
     val_mc_errors = []
     w1, w2 = initialize_weights(d, n_hidden_layers)
     while float(total_err) > stopping_criterion:
-        if not idx % 50:
-            train_errors.append(float(compute_error(x_data, y_data, w1, w2)))
-            test_errors.append(float(compute_error(x_test, y_test, w1, w2)))
-            val_errors.append(float(compute_error(x_val, y_val, w1, w2)))
-            train_mc_errors.append(
-                get_misclassification_error(x_data, y_data, w1, w2))
-            test_mc_errors.append(
-                get_misclassification_error(x_test, y_test, w1, w2))
-            val_mc_errors.append(
-                get_misclassification_error(x_val, y_val, w1, w2))
-        print_misclassification_error(x_test, y_test, w1, w2)
-        total_err = compute_error(x_data, y_data, w1, w2)
-        print('Error: {}'.format(float(total_err)))
-        total_err.backward()
-        w1.data = w1.data - (training_rate * w1.grad.data)
-        w1.grad.data.zero_()
-        w2.data = w2.data - (training_rate * w2.grad.data)
-        w2.grad.data.zero_()
-        idx += 1
+        for idx in range(len(y_data)):
+            if not idx % 50:
+                train_errors.append(
+                    float(compute_total_error(x_data, y_data, w1, w2)))
+                test_errors.append(
+                    float(compute_total_error(x_test, y_test, w1, w2)))
+                val_errors.append(
+                    float(compute_total_error(x_val, y_val, w1, w2)))
+                train_mc_errors.append(
+                    get_misclassification_error(x_data, y_data, w1, w2))
+                test_mc_errors.append(
+                    get_misclassification_error(x_test, y_test, w1, w2))
+                val_mc_errors.append(
+                    get_misclassification_error(x_val, y_val, w1, w2))
+                print_misclassification_error(x_test, y_test, w1, w2)
+                total_err = compute_total_error(x_data, y_data, w1, w2)
+                print('Error: {}'.format(float(total_err)))
+            err_est = compute_error(x_data[idx], y_data[idx], w1, w2)
+            err_est.backward()
+            w1.data = w1.data - (training_rate * w1.grad.data)
+            w1.grad.data.zero_()
+            w2.data = w2.data - (training_rate * w2.grad.data)
+            w2.grad.data.zero_()
     return (
         test_errors,
         val_errors,
@@ -89,7 +97,7 @@ def train_mlp(n_hidden_layers, training_rate, stopping_criterion):
     )
 
 if __name__ == '__main__':
-    training_rate = 0.0001
+    training_rate = 0.00005
     stopping_criterion = 0.03
     for n_hidden_layers in [10, 100, 500]:
         print('\n\n\nN hidden layers: {}\n\n\n'.format(n_hidden_layers))

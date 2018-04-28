@@ -1,6 +1,6 @@
 import torch
 from torch.autograd import Variable
-from utils.coco_utils import load_data
+from utils.coco_utils import load_data_small_supercategory
 from utils.redis_utils import cache
 from hw1_graphs import draw_error_over_time
 
@@ -38,7 +38,7 @@ def print_misclassification_error(x_data, y_data, w):
 
 
 def train_model_sgd(training_rate, lambda_):
-    x_data, y_data = load_data('train2014')
+    x_data, y_data = load_data_small_supercategory('train2014')
     w = initialize_weight_vector(len(x_data[0]))
     n_ = len(x_data)
     for i in range(1000):
@@ -55,9 +55,9 @@ def train_model_sgd(training_rate, lambda_):
 
 @cache.cached(timeout=60 * 60 * 24 * 60)
 def train_linear_model(training_rate, lambda_, stopping_criterion):
-    x_data, y_data = load_data('train2014')
-    x_test, y_test = load_data('test2014')
-    x_val, y_val = load_data('val2014')
+    x_data, y_data = load_data_small_supercategory('train2014')
+    x_test, y_test = load_data_small_supercategory('test2014')
+    x_val, y_val = load_data_small_supercategory('val2014')
     x_data = Variable(torch.from_numpy(x_data), requires_grad=True)
     y_data = Variable(torch.from_numpy(y_data).float(), requires_grad=True)
     x_test = Variable(torch.from_numpy(x_test))
