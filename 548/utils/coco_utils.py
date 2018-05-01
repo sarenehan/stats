@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pycocotools.coco import COCO
 from utils.redis_utils import cache
 import pickle
@@ -73,21 +74,22 @@ def load_data_tiny_supercategory(data_type):
     return x, y
 
 
-def enocode_feature_set(y):
-    unique_features = list(set(y))
+def enocode_feature_set(y, unique_features):
     unique_features.sort()
     feature_to_idx = {
         feature: idx for idx, feature in enumerate(unique_features)
     }
     y_new = np.zeros((len(y), len(unique_features)))
     for row, y_label in zip(y_new, y):
-        row[feature_to_idx[y_label]] = 1
+        for category in y_label:
+            row[feature_to_idx[category]] = 1
     return y_new
 
 
-def load_category_level_data(size, data_type):
+@cache.cached(timeout=60 * 60 * 24 * 60)
+def load_category_level_data_hw2(size, data_type):
     file_location = os.path.join(
-        dataDir, 'features_{}'.format(size), '{}.p'.format(data_type)
+        dataDir, 'features2_{}'.format(size), '{}.p'.format(data_type)
     )
     with open(file_location, 'rb') as f:
         u = pickle._Unpickler(f)
@@ -96,11 +98,23 @@ def load_category_level_data(size, data_type):
     coco = get_coco(data_type)
     annotation_ids = coco.getAnnIds(imgIds=img_list,  iscrowd=None)
     annotations = coco.loadAnns(annotation_ids)
-    image_id_to_category = {
-        annotation['image_id']: annotation['category_id']
-        for annotation in annotations
+    categories = coco.loadCats(coco.getCatIds())
+    cat_id_to_supercat = {
+        cat['id']: cat['supercategory']
+        for cat in categories
     }
-    y = np.array([image_id_to_category[image_id] for image_id in img_list])
-    y = enocode_feature_set(y)
-    x = np.array([point.ravel() for point in feats])
+    image_id_to_category = defaultdict(list)
+    category_ids = []
+    for annotation in annotations:
+        if cat_id_to_supercat[annotation['category_id']] in [
+                'animal', 'vehicle']:
+            image_id_to_category[annotation['image_id']].append(
+                annotation['category_id'])
+            category_ids.append(annotation['category_id'])
+    y = [image_id_to_category[image_id] for image_id in img_list]
+    y = enocode_feature_set(y, list(set(category_ids)))
+    x = np.array([
+        point.ravel() for idx, point in enumerate(feats)
+        if img_list[idx] in image_id_to_category]
+    )
     return x, y
