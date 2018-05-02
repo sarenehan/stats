@@ -7,7 +7,7 @@ import numpy as np
 
 
 if 'stewart' in os.getenv('PYTHONPATH').lower():
-    dataDir = '/Users/stewart/projects/stats/548/data'
+    dataDir = '/Users/stewart/projects/stats/data/'
 else:
     dataDir = '/home/ubuntu/548/data'
 
