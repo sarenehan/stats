@@ -9,3 +9,13 @@ def draw_error_over_time(
     plt.legend(loc="best")
     plt.ylabel(y_label)
     plt.title(title)
+
+
+def draw_train_and_dev_errors_over_time(
+        train_errors, dev_errors, title, y_label):
+    plt.plot(train_errors, label="Train")
+    plt.plot(dev_errors, label="Development")
+    plt.legend(loc="best")
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.show()

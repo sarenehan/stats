@@ -3,11 +3,9 @@ import torch
 import random
 import pickle
 from copy import copy
-from utils.redis_utils import cache
 from torch.autograd import Variable
 from utils.coco_utils import load_category_level_data_hw2
 from sklearn.metrics import average_precision_score
-# from utils.graph_utils import draw_error_over_time
 
 
 if 'stewart' in os.getenv('PYTHONPATH').lower():
@@ -48,7 +46,6 @@ def get_average_precision_score(x_data, y_data, w):
     return average_precision_score(y_data.data, predict(x_data, w).data)
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def train_linear_regression(
         lambda_,
         training_rate,
@@ -116,13 +113,12 @@ def train_linear_regression(
     )
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def train_linear_regression_nesterov(
         lambda_,
         training_rate,
         loss_function=squared_loss,
         mini_batch_size=1,
-        feature_size='tiny',
+        feature_size='small',
         stopping_criterion=10):
     x_data, y_data = load_category_level_data_hw2(feature_size, 'train2014')
     x_val, y_val = load_category_level_data_hw2(feature_size, 'val2014')
@@ -142,7 +138,7 @@ def train_linear_regression_nesterov(
     val_errors = []
     train_average_precision_scores = []
     val_average_precision_scores = []
-    while grad_norm > stopping_criterion and iteration_num < 150000:
+    while grad_norm > stopping_criterion and iteration_num < 35000:
         if not iteration_num % half_epoch:
             train_error = compute_error(
                 w, x_data, y_data, lambda_, loss_function)
@@ -179,6 +175,77 @@ def train_linear_regression_nesterov(
         w.data = w.data - v_t.data
         w.grad.data.zero_()
         v_t.grad.data.zero_()
+    return (
+        train_errors,
+        val_errors,
+        train_average_precision_scores,
+        val_average_precision_scores,
+        w.data
+    )
+
+
+def train_linear_regression_adagrad(
+        lambda_,
+        training_rate,
+        loss_function=squared_loss,
+        mini_batch_size=1,
+        feature_size='tiny',
+        stopping_criterion=10):
+    x_data, y_data = load_category_level_data_hw2(feature_size, 'train2014')
+    x_val, y_val = load_category_level_data_hw2(feature_size, 'val2014')
+    x_data = Variable(torch.from_numpy(x_data), requires_grad=True)
+    y_data = Variable(torch.from_numpy(y_data).float(), requires_grad=True)
+    x_val = Variable(torch.from_numpy(x_val))
+    y_val = Variable(torch.from_numpy(y_val).float())
+    w = initialize_weights(x_data.shape[1], y_data.shape[1])
+    indexes = list(range(x_data.size()[0]))
+    train_error = float('inf')
+    grad_norm = 100
+    iteration_num = 0
+    half_epoch = int(x_data.size()[0] / (2 * mini_batch_size))
+    print('Half ephoc: {}'.format(half_epoch))
+    train_errors = []
+    val_errors = []
+    train_average_precision_scores = []
+    val_average_precision_scores = []
+    grad_sizes = torch.zeros(w.shape)
+    epsilon = torch.zeros(w.shape) + (0.00000001)
+    while grad_norm > stopping_criterion and iteration_num < 35000:
+        if not iteration_num % half_epoch:
+            train_error = compute_error(
+                w, x_data, y_data, lambda_, loss_function)
+            train_error.backward()
+            grad_norm = copy(w.grad.data.norm())
+            train_error = float(train_error)
+            train_average_precision_score = get_average_precision_score(
+                x_data, y_data, w)
+            val_error = float(compute_error(
+                w, x_val, y_val, lambda_, loss_function))
+            val_average_precision_score = get_average_precision_score(
+                x_val, y_val, w)
+            print('\n\n{}'.format(iteration_num))
+            print('Train Error: {}'.format(train_error))
+            print('Train Avg Prec Score: {}'.format(
+                train_average_precision_score))
+            print('Validation Error: {}'.format(val_error))
+            print('Validation Avg Prec Score: {}'.format(
+                val_average_precision_score))
+            print('Gradient Norm: {}'.format(grad_norm))
+            train_errors.append(train_error)
+            val_errors.append(val_error)
+            train_average_precision_scores.append(
+                train_average_precision_score)
+            val_average_precision_scores.append(
+                val_average_precision_score)
+        iteration_num += 1
+        idx = random.sample(indexes, mini_batch_size)
+        err_est = compute_error(
+            w, x_data[idx], y_data[idx], lambda_, loss_function)
+        err_est.backward()
+        grad_sizes = grad_sizes + w.grad.pow(2).data
+        step_size = training_rate / torch.sqrt(grad_sizes + epsilon)
+        w.data = w.data - (step_size * w.grad.data)
+        w.grad.data.zero_()
     return (
         train_errors,
         val_errors,
@@ -226,7 +293,7 @@ def train_sgd_model():
 
 def train_sgd_model_nesterov():
     mini_batch_size = 10
-    lambda_ = 1
+    lambda_ = 10
     training_rate = 0.0000001
     print('Labmda: {}'.format(lambda_))
     print('Trainig Rate: {}'.format(training_rate))
@@ -260,6 +327,44 @@ def train_sgd_model_nesterov():
             w), f)
 
 
+def train_sgd_model_adagrad():
+    mini_batch_size = 10
+    lambda_ = 10
+    training_rate = .0001
+    # training_rate = 0.00000000001
+    print('Labmda: {}'.format(lambda_))
+    print('Trainig Rate: {}'.format(training_rate))
+    print('Mini batch size: {}'.format(mini_batch_size))
+    (
+        train_errors,
+        val_errors,
+        train_average_precision_scores,
+        val_average_precision_scores,
+        w
+    ) = train_linear_regression_adagrad(
+        lambda_,
+        training_rate,
+        loss_function=squared_loss,
+        mini_batch_size=mini_batch_size)
+    print('Train Errors: {}'.format(train_errors))
+    print('Val Errors: {}'.format(val_errors))
+    print('Train APS: {}'.format(train_average_precision_scores))
+    print('Val APS: {}'.format(train_average_precision_scores))
+    print('w: {}'.format(w))
+    with open(save_dir + '{}_linear_regression_w_adagrad.pkl'.format(
+            lambda_), 'wb') as f:
+        pickle.dump(w, f)
+    with open(save_dir + '{}_linear_regression_errors_adagrad.pkl'.format(
+            lambda_), 'wb') as f:
+        pickle.dump((
+            train_errors,
+            val_errors,
+            train_average_precision_scores,
+            val_average_precision_scores,
+            w), f)
+
+
 if __name__ == '__main__':
     # train_sgd_model()
-    train_sgd_model_nesterov()
+    # train_sgd_model_nesterov()
+    train_sgd_model_adagrad()
