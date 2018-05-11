@@ -1,6 +1,9 @@
 from matplotlib import pyplot as plt
 
 
+default_graph_save_location_dir = '/Users/stewart/Desktop/'
+
+
 def draw_error_over_time(
         train_errors, test_errors, val_errors, title, y_label):
     plt.plot(train_errors, label="Train")
@@ -12,10 +15,15 @@ def draw_error_over_time(
 
 
 def draw_train_and_dev_errors_over_time(
-        train_errors, dev_errors, title, y_label):
+        train_errors, dev_errors, title, y_label,
+        save_fig=True, save_location_dir=default_graph_save_location_dir):
+    plt.figure()
     plt.plot(train_errors, label="Train")
     plt.plot(dev_errors, label="Development")
     plt.legend(loc="best")
     plt.ylabel(y_label)
     plt.title(title)
-    plt.show()
+    if save_fig:
+        plt.savefig(default_graph_save_location_dir + title + '.png')
+    else:
+        plt.show()

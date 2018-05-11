@@ -276,7 +276,7 @@ def train_sgd_model():
     print('Train Errors: {}'.format(train_errors))
     print('Val Errors: {}'.format(val_errors))
     print('Train APS: {}'.format(train_average_precision_scores))
-    print('Val APS: {}'.format(train_average_precision_scores))
+    print('Val APS: {}'.format(val_average_precision_scores))
     print('w: {}'.format(w))
     with open(save_dir + '{}_linear_regression_w.pkl'.format(
             lambda_), 'wb') as f:
@@ -312,7 +312,7 @@ def train_sgd_model_nesterov():
     print('Train Errors: {}'.format(train_errors))
     print('Val Errors: {}'.format(val_errors))
     print('Train APS: {}'.format(train_average_precision_scores))
-    print('Val APS: {}'.format(train_average_precision_scores))
+    print('Val APS: {}'.format(val_average_precision_scores))
     print('w: {}'.format(w))
     with open(save_dir + '{}_linear_regression_w_nest.pkl'.format(
             lambda_), 'wb') as f:
@@ -349,7 +349,7 @@ def train_sgd_model_adagrad():
     print('Train Errors: {}'.format(train_errors))
     print('Val Errors: {}'.format(val_errors))
     print('Train APS: {}'.format(train_average_precision_scores))
-    print('Val APS: {}'.format(train_average_precision_scores))
+    print('Val APS: {}'.format(val_average_precision_scores))
     print('w: {}'.format(w))
     with open(save_dir + '{}_linear_regression_w_adagrad.pkl'.format(
             lambda_), 'wb') as f:

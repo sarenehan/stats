@@ -1,6 +1,7 @@
+pycocotools==2.0.0
 Cython==0.28.1
 walrus==0.5.1
-pycocotools==2.0.0
 awscli==1.14.50
 sklearn==0.0
 scipy==1.0.0
+boto==2.48.0

@@ -2,23 +2,192 @@ from collections import defaultdict
 from pycocotools.coco import COCO
 from utils.redis_utils import cache
 import pickle
+from math import floor, ceil
 import os
+import sys
 import numpy as np
+import torch
+import torch.nn as nn
+import cv2
+import random
 
 
+ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 if 'stewart' in os.getenv('PYTHONPATH').lower():
-    dataDir = '/Users/stewart/projects/stats/data/'
+    dataDir = '/Users/stewart/projects/stats/data'
 else:
     dataDir = '/home/ubuntu/548/data'
 
 
+@cache.cached(timeout=60 * 60 * 24 * 60)
 def get_coco(data_type):
     annFile = '{}/annotations/instances_{}.json'.format(dataDir, data_type)
     return COCO(annFile)
 
 
+def get_all_categories(data_type='train2014'):
+    coco = get_coco(data_type)
+    return coco.loadCats(coco.getCatIds())
+
+
 @cache.cached(timeout=60 * 60 * 24 * 60)
-def load_data_small_supercategory(data_type):
+def category_id_to_info(data_type='train2014'):
+    return {cat['id']: cat for cat in get_all_categories()}
+
+
+def get_all_annotations(data_type='train2014'):
+    coco = get_coco(data_type)
+    return coco.loadAnns(coco.getAnnIds())
+
+
+def get_image_ids_for_category(category_id, data_type='train2014'):
+    annotations = get_all_annotations(data_type=data_type)
+    img_ids = [
+        ann['image_id'] for ann in annotations
+        if ann['category_id'] == category_id
+    ]
+    return list(set(img_ids))
+
+
+def get_annotations_for_images(image_ids, data_type='train2014'):
+    annotations = get_all_annotations(data_type=data_type)
+    img_id_to_annotation = defaultdict(list)
+    for ann in annotations:
+        if ann['image_id'] in image_ids:
+            img_id_to_annotation[ann['image_id']].append(ann)
+    return img_id_to_annotation
+
+
+def get_all_img_ids(data_type='train2014'):
+    return get_coco(data_type).getImgIds()
+
+
+class Featurizer:
+    dim = 11776  # for small features
+
+    def __init__(self):
+        # pyramidal pooling of sizes 1, 3, 6
+        self.pool1 = nn.AdaptiveMaxPool2d(1)
+        self.pool3 = nn.AdaptiveMaxPool2d(3)
+        self.pool6 = nn.AdaptiveMaxPool2d(6)
+        self.lst = [self.pool1, self.pool3, self.pool6]
+
+    def featurize(self, projected_bbox, image_features):
+        # projected_bbox: bbox projected onto final layer
+        # image_features: C x W x H tensor : output of conv net
+        full_image_features = torch.from_numpy(image_features)
+        x, y, x1, y1 = projected_bbox
+        crop = full_image_features[:, x:x1, y:y1]
+        return torch.cat([self.pool1(crop).view(-1), self.pool3(crop).view(-1),
+                          self.pool6(crop).view(-1)], dim=0).data.numpy()
+
+
+def get_bboxes(img, num_rects=2000):
+    try:
+        ss.setBaseImage(img)
+        ss.switchToSelectiveSearchQuality()  # good quality search
+        # ss.switchToSelectiveSearchFast() # fast search
+        rects = ss.process()
+        return rects[:num_rects]
+    except KeyboardInterrupt:
+        print('keyboard interrupt')
+        sys.exit()
+    except:
+        return None
+
+
+def iou(rect1, rect2):  # rect = [x, y, w, h]
+    x1, y1, w1, h1 = rect1
+    X1, Y1 = x1 + w1, y1 + h1
+    x2, y2, w2, h2 = rect2
+    X2, Y2 = x2 + w2, y2 + h2
+    a1 = (X1 - x1 + 1) * (Y1 - y1 + 1)
+    a2 = (X2 - x2 + 1) * (Y2 - y2 + 1)
+    x_int = max(x1, x2)
+    X_int = min(X1, X2)
+    y_int = max(y1, y2)
+    Y_int = min(Y1, Y2)
+    a_int = (X_int - x_int + 1) * (Y_int - y_int + 1) * 1.0
+    if x_int > X_int or y_int > Y_int:
+        a_int = 0.0
+    return a_int / (a1 + a2 - a_int)
+
+
+# nearest neighbor in 1-based indexing
+def _nnb_1(x):
+    x1 = int(floor((x + 8) / 16.0))
+    x1 = max(1, min(x1, 13))
+    return x1
+
+
+def project_onto_feature_space(rect, image_dims):
+    # project bounding box onto conv net
+    # @param rect: (x, y, w, h)
+    # @param image_dims: (imgx, imgy), the size of the image
+    # output bbox: (x, y, x'+1, y'+1) where the box is x:x', y:y'
+
+    # For conv 5, center of receptive field of i is i_0 = 16 i for 1-based
+    # indexing
+    imgx, imgy = image_dims
+    x, y, w, h = rect
+    # scale to 224 x 224, standard input size.
+    x1, y1 = ceil((x + w) * 224 / imgx), ceil((y + h) * 224 / imgy)
+    x, y = floor(x * 224 / imgx), floor(y * 224 / imgy)
+    px = _nnb_1(x + 1) - 1  # inclusive
+    py = _nnb_1(y + 1) - 1  # inclusive
+    px1 = _nnb_1(x1 + 1)  # exclusive
+    py1 = _nnb_1(y1 + 1)  # exclusive
+    return [px, py, px1, py1]
+
+
+def get_positive_and_easy_negative_bounding_boxes(
+        img, correct_bbox, num_rects=2000, min_iou=.5, neg_to_pos_ratio=2):
+    proposals = get_bboxes(img)
+    correct_bboxes = []
+    incorrect_bboxes = []
+    if hasattr(proposals, '__iter__'):
+        for proposal in proposals:
+            if iou(proposal, correct_bbox) > min_iou:
+                correct_bboxes.append(proposal)
+            else:
+                incorrect_bboxes.append(proposal)
+    else:
+        return [], []
+    n_to_sample = len(correct_bboxes) * neg_to_pos_ratio
+    incorrect_bboxes = random.sample(incorrect_bboxes, n_to_sample)
+    return correct_bboxes, incorrect_bboxes
+
+
+def get_positive_and_easy_negative_projected_bboxes(
+        img, correct_bbox, num_rects=2000, min_iou=0.5, neg_to_pos_ratio=2):
+    positive_bboxes, negative_bboxes = \
+        get_positive_and_easy_negative_bounding_boxes(
+            img, correct_bbox, num_rects, min_iou, neg_to_pos_ratio
+        )
+    positive_projs = [
+        project_onto_feature_space(bbox, (img.shape[1], img.shape[0]))
+        for bbox in positive_bboxes
+    ]
+    negative_projs = [
+        project_onto_feature_space(bbox, (img.shape[1], img.shape[0]))
+        for bbox in negative_bboxes
+    ]
+    return positive_projs, negative_projs
+
+
+def load_images_cv2(img_ids, data_type='train2014'):
+    coco = get_coco(data_type)
+    images = coco.loadImgs(img_ids)
+    images = {
+        img['id']:
+        cv2.imread('%s/%s/%s' % (dataDir, data_type, img['file_name']))
+        for img in images
+    }
+    return {key: val for key, val in images.items() if val is not None}
+
+
+@cache.cached(timeout=60 * 60 * 24 * 60)
+def load_data_small(data_type='train2014'):
     file_location = os.path.join(
         dataDir, 'features_small', '{}.p'.format(data_type)
     )
@@ -26,6 +195,20 @@ def load_data_small_supercategory(data_type):
         u = pickle._Unpickler(f)
         u.encoding = 'latin1'
         [img_list, feats] = u.load()
+    return img_list, feats
+
+
+@cache.cached(timeout=60 * 60 * 24 * 60)
+def features_from_img_id(data_type='train2014'):
+    img_ids, feats = load_data_small(data_type)
+    return {
+        img_id: feature for img_id, feature in zip(img_ids, feats)
+    }
+
+
+@cache.cached(timeout=60 * 60 * 24 * 60)
+def load_data_small_supercategory(data_type):
+    img_list, feats = load_data_small(data_type)
     coco = get_coco(data_type)
     annotation_ids = coco.getAnnIds(imgIds=img_list,  iscrowd=None)
     annotations = coco.loadAnns(annotation_ids)
@@ -118,3 +301,22 @@ def load_category_level_data_hw2(size, data_type):
         if img_list[idx] in image_id_to_category]
     )
     return x, y
+
+
+def get_positive_and_easy_negative_features_for_image(
+        img_id, img, correct_bbox, data_type='train2014',
+        num_rects=2000, min_iou=0.5):
+    pos_projected_bboxes, neg_projected_bboxes = \
+        get_positive_and_easy_negative_projected_bboxes(
+            img, correct_bbox, num_rects=2000, min_iou=0.5, neg_to_pos_ratio=2)
+    featurizer = Featurizer()
+    image_features_dict = features_from_img_id(data_type)
+    positive_features = [
+        featurizer.featurize(projected_bbox, image_features_dict[img_id])
+        for projected_bbox in pos_projected_bboxes
+    ]
+    negative_features = [
+        featurizer.featurize(projected_bbox, image_features_dict[img_id])
+        for projected_bbox in neg_projected_bboxes
+    ]
+    return positive_features, negative_features

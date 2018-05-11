@@ -68,6 +68,7 @@ def sgd_linear_regression():
 
 
 def linear_regression_test_error(w, file_prefix):
+    w = Variable(w)
     x_test_, y_test_ = load_category_level_data_hw2('small', 'test2014')
     x_test = Variable(torch.from_numpy(x_test_))
     y_test = Variable(torch.from_numpy(y_test_))
@@ -78,7 +79,8 @@ def linear_regression_test_error(w, file_prefix):
     ap_score_by_category = []
     for column in range(y_test_.shape[1]):
         ap_score_by_category.append({
-            categories[column]: average_precision_score(
+            'Category': categories[column],
+            'Average Precision Score': average_precision_score(
                 y_test_[:, column], preds[:, column])
         })
     df = pd.DataFrame(ap_score_by_category)
@@ -149,6 +151,8 @@ def mlp_test_error(w1, w2, file_prefix):
     x_test_, y_test_ = load_category_level_data_hw2('small', 'test2014')
     x_test = Variable(torch.from_numpy(x_test_))
     y_test = Variable(torch.from_numpy(y_test_))
+    w1 = Variable(w1)
+    w2 = Variable(w2)
     ap_score = get_average_precision_score_mlp(x_test, y_test, w1, w2)
     print('Overall {} MLP Avg precision score: {}'.format(
         file_prefix, ap_score))
@@ -156,12 +160,28 @@ def mlp_test_error(w1, w2, file_prefix):
     ap_score_by_category = []
     for column in range(y_test_.shape[1]):
         ap_score_by_category.append({
-            categories[column]: average_precision_score(
+            'Category': categories[column],
+            'Average Precision Score': average_precision_score(
                 y_test_[:, column], preds[:, column])
         })
     df = pd.DataFrame(ap_score_by_category)
     df.to_csv('/Users/stewart/Desktop/{}_mlp.csv'.format(
         file_prefix), index=False)
+
+
+def get_class_imbalance():
+    x_test_, y_test_ = load_category_level_data_hw2('small', 'test2014')
+    count_by_class = []
+    n_ = len(y_test_)
+    for idx in range(y_test_.shape[1]):
+        count_by_class.append(
+            {
+                'Category': categories[idx],
+                'Pct in class': y_test_[:, idx].sum() / n_
+            }
+        )
+    pd.DataFrame(count_by_class).to_csv(
+        '/Users/stewart/Desktop/class_imbalance.csv', index=False)
 
 
 def sgd_mlp():
@@ -243,15 +263,16 @@ def adagrad_mlp_test_error():
 
 
 if __name__ == '__main__':
-    sgd_linear_regression()
-    sgd_mlp()
-    sgd_linear_regression_test_error()
-    sgd_mlp_test_error()
-    nesterov_linear_regression()
-    nesterov_mlp()
-    nesterov_linear_regression_test_error()
-    nesterov_mlp_test_error()
-    adagrad_linear_regression()
-    adagrad_mlp()
-    adagrad_linear_regression_test_error()
-    adagrad_mlp_test_error()
+    get_class_imbalance()
+    # sgd_linear_regression()
+    # sgd_mlp()
+    # sgd_linear_regression_test_error()
+    # sgd_mlp_test_error()
+    # nesterov_linear_regression()
+    # nesterov_mlp()
+    # nesterov_linear_regression_test_error()
+    # nesterov_mlp_test_error()
+    # adagrad_linear_regression()
+    # adagrad_mlp()
+    # adagrad_linear_regression_test_error()
+    # adagrad_mlp_test_error()
