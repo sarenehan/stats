@@ -4,14 +4,12 @@ from utils.coco_utils import (
     get_annotations_for_images,
     get_positive_and_easy_negative_features_for_image,
     dataDir,
-    get_all_categories,
+    get_hw3_categories,
 )
+from utils.aws_utils import upload_to_s3
 import os
 import pickle
 import random
-import boto
-import boto.s3
-from boto.s3.key import Key
 
 
 max_bytes = 2**31 - 1
@@ -39,19 +37,6 @@ def unpickle_big_data(file_path):
             for _ in range(0, input_size, max_bytes):
                 bytes_in += f_in.read(max_bytes)
         return pickle.loads(bytes_in)
-
-
-def upload_to_s3(file_path):
-    conn = boto.connect_s3(
-        'AKIAIHIM4TAFUFPV2CMA',
-        'yVEsdhCoizkiMr4/G/YO+nnhERzUF+/HcvEY5dJ3')
-    bucket = conn.get_bucket('stat-548')
-    k = Key(bucket)
-    k.key = 'data/training_features/' + file_path.split('/')[-1]
-    k.set_contents_from_filename(
-        file_path,
-        num_cb=10
-    )
 
 
 def load_data_for_category(category_id):
@@ -85,19 +70,21 @@ def load_data_for_category(category_id):
             'negative_features': negative_features
         }
         pickle_big_data(data_to_save, file_path)
-        upload_to_s3(file_path)
+        upload_to_s3(
+            'data/training_features/' +
+            positive_training_data_save_location.format(
+                data_type, category_id), file_path)
         os.remove(file_path)
 
 
 if __name__ == '__main__':
-    idxes_for_node = list(range(20))
-    # idxes_for_node = list(range(20, 40))
-    # idxes_for_node = list(range(40, 60))
-    # idxes_for_node = list(range(60, 80))
-    categories = get_all_categories(data_type)
-    categories.sort(key=lambda x: x['id'])
-    categories = [
-        cat for idx, cat in enumerate(categories) if idx in idxes_for_node
+    # idxes_for_node = list(range(4))
+    # idxes_for_node = list(range(4, 8))
+    # idxes_for_node = list(range(8, 13))
+    idxes_for_node = list(range(13, 18))
+    category_ids = get_hw3_categories('small', data_type)
+    category_ids = [
+        cat for idx, cat in enumerate(category_ids) if idx in idxes_for_node
     ]
-    for category in categories:
-        load_data_for_category(category['id'])
+    for category_id in category_ids:
+        load_data_for_category(category_id)

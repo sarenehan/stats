@@ -30,7 +30,6 @@ def get_all_categories(data_type='train2014'):
     return coco.loadCats(coco.getCatIds())
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def category_id_to_info(data_type='train2014'):
     return {cat['id']: cat for cat in get_all_categories()}
 
@@ -186,7 +185,6 @@ def load_images_cv2(img_ids, data_type='train2014'):
     return {key: val for key, val in images.items() if val is not None}
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def load_data_small(data_type='train2014'):
     file_location = os.path.join(
         dataDir, 'features_small', '{}.p'.format(data_type)
@@ -198,7 +196,6 @@ def load_data_small(data_type='train2014'):
     return img_list, feats
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def features_from_img_id(data_type='train2014'):
     img_ids, feats = load_data_small(data_type)
     return {
@@ -206,7 +203,6 @@ def features_from_img_id(data_type='train2014'):
     }
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def load_data_small_supercategory(data_type):
     img_list, feats = load_data_small(data_type)
     coco = get_coco(data_type)
@@ -270,6 +266,30 @@ def enocode_feature_set(y, unique_features):
 
 
 @cache.cached(timeout=60 * 60 * 24 * 60)
+def get_hw3_categories(size, data_type):
+    file_location = os.path.join(
+        dataDir, 'features_{}'.format(size), '{}.p'.format(data_type)
+    )
+    with open(file_location, 'rb') as f:
+        u = pickle._Unpickler(f)
+        u.encoding = 'latin1'
+        [img_list, feats] = u.load()
+    coco = get_coco(data_type)
+    annotation_ids = coco.getAnnIds(imgIds=img_list,  iscrowd=None)
+    annotations = coco.loadAnns(annotation_ids)
+    categories = coco.loadCats(coco.getCatIds())
+    cat_id_to_supercat = {
+        cat['id']: cat['supercategory']
+        for cat in categories
+    }
+    category_ids = []
+    for annotation in annotations:
+        if cat_id_to_supercat[annotation['category_id']] in [
+                'animal', 'vehicle']:
+            category_ids.append(annotation['category_id'])
+    return sorted(list(set(category_ids)))
+
+
 def load_category_level_data_hw2(size, data_type):
     file_location = os.path.join(
         dataDir, 'features2_{}'.format(size), '{}.p'.format(data_type)
