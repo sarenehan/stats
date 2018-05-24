@@ -1,21 +1,24 @@
 from utils.coco_utils import (
     dataDir,
     get_hw3_categories,
-    get_features_for_projected_bboxes,
+    get_features_for_bboxes,
+    get_features_for_bboxes_large,
+    plot_bbox,
 )
 from utils.aws_utils import upload_to_s3
 import os
 import pickle
 import boto3
 import random
-import torch
 import numpy as np
-from torch.autograd import Variable
 from sklearn.metrics import average_precision_score
 
 
-data_type = 'train2014'
-save_location = dataDir + '/hw3_model_results_for_category_{}.pkl'
+use_full_dataset = False
+if use_full_dataset:
+    save_location = dataDir + '/hw3_model_results_for_category_{}_large.pkl'
+else:
+    save_location = dataDir + '/hw3_model_results_for_category_{}.pkl'
 
 
 def save_results_to_s3(
@@ -49,50 +52,44 @@ def save_results_to_s3(
 def load_data_for_category(category_id):
     session = boto3.session.Session()
     s3client = session.client('s3')
+    if use_full_dataset:
+        prefix = 'small2'
+    else:
+        prefix = 'small'
     response_train = s3client.get_object(
         Bucket='stat-548',
-        Key='data/training_features/small_train2014_feature_{}.pkl'.format(
-            category_id))
+        Key='data/training_features/{}_train2014_feature_{}.pkl'.format(
+            prefix, category_id))
     response_val = s3client.get_object(
         Bucket='stat-548',
-        Key='data/training_features/small_val2014_feature_{}.pkl'.format(
-            category_id))
+        Key='data/training_features/{}_val2014_feature_{}.pkl'.format(
+            prefix, category_id))
     train = pickle.loads(response_train['Body'].read())
     val = pickle.loads(response_val['Body'].read())
     return train, val
 
 
-def initialize_weights_mlp(n_outputs):
-    w1 = Variable(
-        (torch.rand(11776, 250) - .5) / 1000,
-        requires_grad=True)
-    w2 = Variable((torch.rand(250) - .5) / 1000,
-                  requires_grad=True)
-    return w1, w2
-
-
 def initialize_weights(d):
-    return Variable((torch.rand(d) - .5) / 1000, requires_grad=True)
+    return (np.random.random(d) - .5) / 1000
 
 
 def log_loss(y_hat, y):
-    return -y.mul(torch.log(y_hat)) - (1 - y).mul(
-        torch.log(1 - y_hat))
+    return -(y * np.log(y_hat)) - ((1 - y) * np.log(1 - y_hat))
 
 
-def compute_error_logistic_regression(w, lambda_, x, y, prev_w):
-    preds = 1 / (1 + torch.exp(-x.matmul(w)))
+def compute_error_logistic_regression(w, lambda_, x, y):
+    preds = 1 / (1 + np.exp(-np.matmul(x, w)))
     loss = log_loss(preds, y)
-    regularization = (lambda_ / 2) * (w[1:].norm().pow(2))
-    return loss.mean() + regularization + (lambda_ * (w - prev_w).norm() ** 2)
+    regularization = (lambda_ / 2) * (np.linalg.norm(w) ** 2)
+    return loss.mean() + regularization
 
 
 def predict(x, w):
-    return 1 / (1 + torch.exp(-x.matmul(w)))
+    return 1 / (1 + np.exp(-np.matmul(x, w)))
 
 
 def get_average_precision_score(x_data, y_data, w):
-    return average_precision_score(y_data.data, predict(x_data, w).data)
+    return average_precision_score(y_data, predict(x_data, w))
 
 
 def construct_batches(n_, batch_size):
@@ -104,6 +101,11 @@ def construct_batches(n_, batch_size):
         batches.append(indices[start_idx:start_idx + batch_size])
         start_idx += batch_size
     return batches
+
+
+def compute_gradient(x, y, w, lambda_):
+    preds = 1 / (1 + np.exp(-np.matmul(x, w)))
+    return (np.matmul((preds - y), x) / len(x)) + (lambda_ * w)
 
 
 def train_logistic_regression(
@@ -118,51 +120,46 @@ def train_logistic_regression(
         v_t,
         iter_init=0,
         prev_w=None,
-        max_iter=20000):
+        max_iter=30000):
     iter_ = 0
-    best_val_total_error = float('inf')
     ap_score = 0
     train_errors = []
     val_errors = []
     train_ap_scores = []
     val_ap_scores = []
-    best_weight = None
-    best_v_t = None
     if prev_w is None:
-        prev_w = Variable(torch.zeros(len(w)), requires_grad=True)
+        prev_w = np.zeros(len(w))
     n_ = len(x_train)
-    half_epoch = (int(x_train.size()[0] / (2 * batch_size))) + 1
-    iter_ = iter_init
-    while iter_ < iter_init + 20000:
+    half_epoch = (int(len(x_train) / (2 * batch_size))) + 1
+    # iter_ = iter_init
+    while iter_ < iter_init + max_iter:
         batches = construct_batches(n_, batch_size)
         for idx, batch in enumerate(batches):
             if idx % half_epoch == 0:
                 total_error = float(compute_error_logistic_regression(
-                    w, lambda_, x_train, y_train, prev_w))
+                    w, lambda_, x_train, y_train))
                 ap_score = get_average_precision_score(x_train, y_train, w)
                 total_error_val = float(
-                    compute_error_logistic_regression(w, lambda_, x_val, y_val, prev_w)
+                    compute_error_logistic_regression(
+                        w, lambda_, x_val, y_val)
                 )
                 ap_score_val = get_average_precision_score(x_val, y_val, w)
-                print('{}'.format(iter_))
-                print('\tTrain Error: {}'.format(total_error))
-                print('\tTrain AP Score: {}'.format(ap_score))
-                print('\tVal Error: {}'.format(total_error_val))
-                print('\tVal AP Score: {}'.format(ap_score_val))
+                # print('{}'.format(iter_))
+                # print('\tTrain Error: {}'.format(total_error))
+                # print('\tTrain AP Score: {}'.format(ap_score))
+                # print('\tVal Error: {}'.format(total_error_val))
+                # print('\tVal AP Score: {}'.format(ap_score_val))
+                grad_norm = np.linalg.norm(compute_gradient(
+                    x_train, y_train, w, lambda_))
+                # print('\tGrad norm: {}'.format(grad_norm))
                 train_errors.append(total_error)
                 val_errors.append(total_error_val)
                 train_ap_scores.append(ap_score)
                 val_ap_scores.append(ap_score_val)
-                if total_error_val < best_val_total_error:
-                    best_val_total_error = total_error_val
-                    best_weight = w.data.numpy()
-                    best_v_t = v_t.data.numpy()
-                elif len(val_errors) - val_errors.index(
-                        best_val_total_error) > 8:
-                    print('Best val error: {}'.format(best_val_total_error))
+                if grad_norm < 4:
                     return (
-                        best_weight,
-                        best_v_t,
+                        w,
+                        v_t,
                         train_errors,
                         val_errors,
                         train_ap_scores,
@@ -170,20 +167,15 @@ def train_logistic_regression(
                         iter_
                     )
             # Nesterov momentum
-            err_est = compute_error_logistic_regression(
-                w - 0.9 * v_t, lambda_, x_train[batch], y_train[batch], prev_w)
-            err_est.backward()
-            v_t.data = (0.9 * v_t.data) + ((training_rate / (
-                (iter_ + 1) ** (1 / 3))) * (
-                w.grad.data - (0.9 * v_t.grad.data)))
-            w.data = w.data - v_t.data
-            w.grad.data.zero_()
-            v_t.grad.data.zero_()
+            grad = compute_gradient(
+                x_train[batch], y_train[batch], w - (0.9 * v_t), lambda_)
+            v_t = (0.9 * v_t) + ((training_rate / (
+                (iter_ + 1) ** (1 / 3))) * grad)
+            w = w - v_t
             iter_ += 1
-    print('Best val error: {}'.format(best_val_total_error))
     return (
-        best_weight,
-        best_v_t,
+        w,
+        v_t,
         train_errors,
         val_errors,
         train_ap_scores,
@@ -220,9 +212,12 @@ def determine_negative_features(x, y, w, data_type):
         x = x[all_indices]
         positive_indices = np.where(y == 1)[0]
         negative_indices = np.where(y == 0)[0]
-    x = get_features_for_projected_bboxes(x, data_type=data_type)
+    if use_full_dataset:
+        get_features_for_bboxes_large(x, data_type)
+    else:
+        x = get_features_for_bboxes(x, data_type)
     # x = np.hstack((np.ones((len(x), 1)), x))  # for the intercept...
-    if w is not None and 'val' not in data_type:
+    if w is not None:
         total_ap_score = average_precision_score(y, predict_numpy(x, w))
         print('Total AP score {}: {}'.format(data_type, total_ap_score))
         predictions = predict_numpy(x[negative_indices], w)
@@ -241,25 +236,35 @@ def determine_negative_features(x, y, w, data_type):
         neg_indices_to_use = np.concatenate(
             [hard_negative_indices_to_use, random_neg_indices_to_use]
         )
-    elif 'val' not in data_type:
+    else:
         neg_indices_to_use = np.random.choice(
             negative_indices,
             replace=False,
             size=len(positive_indices) * 2
         )
+        hard_negative_indices_to_use = None
         total_ap_score = None
-    else:
-        neg_indices_to_use = negative_indices
-        if w is not None:
-            total_ap_score = average_precision_score(y, predict_numpy(x, w))
-        else:
-            total_ap_score = None
     indices_to_use = np.concatenate([neg_indices_to_use, positive_indices])
     x = x[indices_to_use]
     y = y[indices_to_use]
-    x = Variable(torch.from_numpy(x).float(), requires_grad=True)
-    y = Variable(torch.from_numpy(y).float(), requires_grad=True)
-    return x, y, total_ap_score
+    return x, y, total_ap_score, hard_negative_indices_to_use
+
+
+def plot_some_hard_negatives(train, hard_negative_idxs, i):
+    n_positive = len(train['positive_features'])
+    for idx, hard_negative_idx in enumerate(
+            random.sample(hard_negative_idxs, 4)):
+        neg_idx = hard_negative_idx - n_positive
+        image = train['negative_features'][neg_idx]
+        bbox = image['bbox']
+        img_id = image['img_id']
+        plot_bbox(
+            bbox,
+            img_id,
+            'train2014',
+            is_large=use_full_dataset,
+            save_fig=False,
+            save_prefix='hard_negatives_round_{}_{}'.format(i + 1, idx + 1))
 
 
 def train_model(
@@ -268,12 +273,12 @@ def train_model(
         lambda_,
         training_rate,
         batch_size):
-    x_train, y_train, _ = determine_negative_features(
+    x_train, y_train, _, _ = determine_negative_features(
         *preprocess_data(train), None, 'train2014')
-    x_val, y_val, _ = determine_negative_features(
+    x_val, y_val, _, _ = determine_negative_features(
         *preprocess_data(val), None, 'val2014')
     w = initialize_weights(x_train.shape[1])
-    v_t = Variable(torch.zeros(w.shape), requires_grad=True)
+    v_t = np.zeros(len(w))
     (
         w,
         v_t,
@@ -296,10 +301,11 @@ def train_model(
     total_val_ap_scores = []
     ws = [w]
     for i in range(10):
-        x_train, y_train, total_train_ap_score = determine_negative_features(
+        x_train, y_train, total_train_ap_score, hard_negative_idxs = determine_negative_features(
             *preprocess_data(train), w, 'train2014')
-        x_val, y_val, total_val_ap_score = determine_negative_features(
+        x_val, y_val, total_val_ap_score, _  = determine_negative_features(
             *preprocess_data(val), w, 'val2014')
+        plot_some_hard_negatives(train, hard_negative_idxs, i)
         total_train_ap_scores.append(total_train_ap_score)
         total_val_ap_scores.append(total_val_ap_score)
         (
@@ -318,10 +324,10 @@ def train_model(
             lambda_,
             training_rate,
             batch_size,
-            Variable(torch.from_numpy(w).float(), requires_grad=True),
-            Variable(torch.from_numpy(v_t).float(), requires_grad=True),
+            w,
+            v_t,
             iter_init=iter_,
-            prev_w=Variable(torch.from_numpy(w).float(), requires_grad=True))
+            prev_w=w)
         ws.append(w)
         train_ap_scores_list.extend(train_ap_scores)
         val_ap_scores_list.extend(val_ap_scores)
@@ -339,8 +345,8 @@ def train_model(
 def train_and_save_model_for_category(category_id):
     print('Generating model for cat id {}'.format(category_id))
     train, val = load_data_for_category(category_id)
-    lambda_ = 1000
-    training_rate = 0.00000001
+    lambda_ = 1
+    training_rate = 0.000001
     batch_size = 10
     print('Lambda: {}'.format(lambda_))
     print('Training rate: {}'.format(training_rate))
@@ -371,6 +377,6 @@ if __name__ == '__main__':
     # category_ids = [
     #     cat for idx, cat in enumerate(category_ids) if idx in idxes_for_node
     # ]
-    category_ids = [23]
+    category_ids = [2]
     for category_id in category_ids:
         train_and_save_model_for_category(category_id)

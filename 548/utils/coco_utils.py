@@ -1,4 +1,6 @@
 from collections import defaultdict
+import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
 from pycocotools.coco import COCO
 from utils.redis_utils import cache
 import pickle
@@ -37,6 +39,17 @@ def category_id_to_info(data_type='train2014'):
 def get_all_annotations(data_type='train2014'):
     coco = get_coco(data_type)
     return coco.loadAnns(coco.getAnnIds())
+
+
+@cache.cached(timeout=60 * 60 * 24 * 60)
+def image_id_to_categories(data_type='train2014'):
+    annotations = get_all_annotations(data_type=data_type)
+    image_id_to_category_dict = defaultdict(set)
+    for ann in annotations:
+        image_id_to_category_dict[ann['category_id']].add(
+            ann['image_id']
+        )
+    return image_id_to_category_dict
 
 
 def get_image_ids_for_category(category_id, data_type='train2014'):
@@ -139,8 +152,12 @@ def project_onto_feature_space(rect, image_dims):
     return [px, py, px1, py1]
 
 
+def project_from_feature_space_to_image(img_dict):
+    pass
+
+
 def get_positive_and_easy_negative_bounding_boxes(
-        img, correct_bbox, num_rects=2000, min_iou=.5, neg_to_pos_ratio=2):
+        img, correct_bbox, num_rects=2000, min_iou=.5, neg_to_pos_ratio=100):
     proposals = get_bboxes(img)
     correct_bboxes = []
     incorrect_bboxes = []
@@ -152,13 +169,14 @@ def get_positive_and_easy_negative_bounding_boxes(
                 incorrect_bboxes.append(proposal)
     else:
         return [], []
-    n_to_sample = len(correct_bboxes) * neg_to_pos_ratio
+    n_to_sample = min(len(correct_bboxes) * neg_to_pos_ratio,
+                      len(incorrect_bboxes))
     incorrect_bboxes = random.sample(incorrect_bboxes, n_to_sample)
     return correct_bboxes, incorrect_bboxes
 
 
-def get_positive_and_easy_negative_projected_bboxes(
-        img, correct_bbox, num_rects=2000, min_iou=0.5, neg_to_pos_ratio=2):
+def get_positive_and_negative_projected_bboxes(
+        img, correct_bbox, num_rects=2000, min_iou=0.5, neg_to_pos_ratio=100):
     positive_bboxes, negative_bboxes = \
         get_positive_and_easy_negative_bounding_boxes(
             img, correct_bbox, num_rects, min_iou, neg_to_pos_ratio
@@ -185,6 +203,18 @@ def load_images_cv2(img_ids, data_type='train2014'):
     return {key: val for key, val in images.items() if val is not None}
 
 
+def load_images_cv2_large(img_ids, data_type='train2014'):
+    coco = get_coco(data_type)
+    data_type = data_type + '_2'
+    images = coco.loadImgs(img_ids)
+    images = {
+        img['id']:
+        cv2.imread('%s/%s/%s' % (dataDir, data_type, img['file_name']))
+        for img in images
+    }
+    return {key: val for key, val in images.items() if val is not None}
+
+
 def load_data_small(data_type='train2014'):
     file_location = os.path.join(
         dataDir, 'features_small', '{}.p'.format(data_type)
@@ -196,8 +226,50 @@ def load_data_small(data_type='train2014'):
     return img_list, feats
 
 
+def load_data_large(data_type='train2014'):
+    file_location = os.path.join(
+        dataDir, 'features2_small', '{}.p'.format(data_type)
+    )
+    with open(file_location, 'rb') as f:
+        u = pickle._Unpickler(f)
+        u.encoding = 'latin1'
+        [img_list, feats] = u.load()
+    return img_list, feats
+
+
+def load_bboxes_small(data_type='train2014'):
+    file_location = os.path.join(
+        dataDir, 'bboxes', '{}_bboxes.p'.format(data_type)
+    )
+    with open(file_location, 'rb') as f:
+        u = pickle._Unpickler(f)
+        u.encoding = 'latin1'
+        [img_list, feats] = u.load()
+    return img_list, feats
+
+
+def load_bboxes_large(data_type='train2014'):
+    file_location = os.path.join(
+        dataDir, 'bboxes2', '{}_bboxes.p'.format(data_type)
+    )
+    with open(file_location, 'rb') as f:
+        u = pickle._Unpickler(f)
+        u.encoding = 'latin1'
+        [img_list, feats] = u.load()
+    return img_list, feats
+
+
+@cache.cached(timeout=60 * 60 * 24 * 60)
 def features_from_img_id(data_type='train2014'):
     img_ids, feats = load_data_small(data_type)
+    return {
+        img_id: feature for img_id, feature in zip(img_ids, feats)
+    }
+
+
+@cache.cached(timeout=60 * 60 * 24 * 60)
+def features_from_img_id_large(data_type='train2014'):
+    img_ids, feats = load_data_large(data_type)
     return {
         img_id: feature for img_id, feature in zip(img_ids, feats)
     }
@@ -323,20 +395,72 @@ def load_category_level_data_hw2(size, data_type):
     return x, y
 
 
-def get_positive_and_easy_negative_features_for_image(
-        img_id, img, correct_bbox, data_type='train2014',
-        num_rects=2000, min_iou=0.5):
-    pos_projected_bboxes, neg_projected_bboxes = \
-        get_positive_and_easy_negative_projected_bboxes(
-            img, correct_bbox, num_rects=2000, min_iou=0.5, neg_to_pos_ratio=2)
+def get_feature_for_projected_bbox(projected_bbox, data_type='train2014'):
     featurizer = Featurizer()
     image_features_dict = features_from_img_id(data_type)
-    positive_features = [
-        featurizer.featurize(projected_bbox, image_features_dict[img_id])
-        for projected_bbox in pos_projected_bboxes
-    ]
-    negative_features = [
-        featurizer.featurize(projected_bbox, image_features_dict[img_id])
-        for projected_bbox in neg_projected_bboxes
-    ]
-    return positive_features, negative_features
+    return featurizer.featurize(
+        projected_bbox['projected_bbox'],
+        image_features_dict[projected_bbox['img_id']])
+
+
+def get_features_for_projected_bboxes(
+        projected_bboxes,
+        data_type='train2014'):
+    featurizer = Featurizer()
+    image_features_dict = features_from_img_id(data_type)
+    return np.array([
+        featurizer.featurize(
+            bbox['projected_bbox'],
+            image_features_dict[bbox['img_id']])
+        for bbox in projected_bboxes
+    ])
+
+
+def get_features_for_bboxes(bboxes, data_type):
+    featurizer = Featurizer()
+    image_features_dict = features_from_img_id(data_type)
+    return np.array([
+        featurizer.featurize(
+            project_onto_feature_space(bbox['bbox'], bbox['image_shape']),
+            image_features_dict[bbox['img_id']])
+        for bbox in bboxes
+    ])
+
+
+def get_features_for_bboxes_large(bboxes, data_type):
+    featurizer = Featurizer()
+    image_features_dict = features_from_img_id_large(data_type)
+    return np.array([
+        featurizer.featurize(
+            project_onto_feature_space(bbox['bbox'], bbox['image_shape']),
+            image_features_dict[bbox['img_id']])
+        for bbox in bboxes
+    ])
+
+
+def ensure_dir(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+def plot_bbox(
+        bbox,
+        img_id,
+        data_type,
+        is_large=False,
+        save_fig=False,
+        save_prefix=''):
+    coco = get_coco(data_type)
+    img = coco.loadImgs([img_id])[0]
+    if is_large:
+        data_type = data_type + '_2'
+    img_pil = Image.open('%s/%s/%s' % (dataDir, data_type, img['file_name']))
+    draw = ImageDraw.Draw(img_pil)
+    x, y, w, h = bbox
+    draw.rectangle(((x, y, x + w, y + h)), fill=None, outline=(255, 0, 0))
+    plt.imshow(img_pil)
+    if save_fig:
+        ensure_dir(dataDir + '/plots/')
+        plt.savefig(dataDir + save_prefix + 'bbox_{}.png'.format(img_id))
+    else:
+        plt.show()

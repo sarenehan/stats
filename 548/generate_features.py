@@ -1,20 +1,27 @@
 from utils.coco_utils import (
     image_id_to_categories,
     load_images_cv2,
+    load_images_cv2_large,
     get_annotations_for_images,
-    get_positive_and_negative_projected_bboxes,
     dataDir,
     get_hw3_categories,
+    load_bboxes_small,
+    load_bboxes_large,
+    iou,
 )
+import numpy as np
 from utils.aws_utils import upload_to_s3
 import os
 import pickle
-import random
 
-
+use_full_dataset = True
 max_bytes = 2**31 - 1
-positive_training_data_save_location = dataDir + \
-    '/small_{}_feature_{}.pkl'
+if use_full_dataset:
+    positive_training_data_save_location = dataDir + \
+        '/small2_{}_feature_{}.pkl'
+else:
+    positive_training_data_save_location = dataDir + \
+        '/small_{}_feature_{}.pkl'
 
 
 def pickle_big_data(data, file_path):
@@ -24,31 +31,21 @@ def pickle_big_data(data, file_path):
             f_out.write(bytes_out[idx:idx + max_bytes])
 
 
-def unpickle_big_data(file_path):
-    try:
-        with open(file_path, 'rb') as f:
-            return pickle.load(f)
-    except:
-        bytes_in = bytearray(0)
-        input_size = os.path.getsize(file_path)
-        with open(file_path, 'rb') as f_in:
-            for _ in range(0, input_size, max_bytes):
-                bytes_in += f_in.read(max_bytes)
-        return pickle.loads(bytes_in)
-
-
 def load_data_for_category(
         category_id,
         img_id_to_bboxes,
         data_type):
     print('Loading training data for {}'.format(category_id))
     img_ids = list(image_id_to_categories(data_type)[category_id])
-    images = load_images_cv2(img_ids, data_type)
+    if use_full_dataset:
+        images = load_images_cv2_large(img_ids, data_type)
+    else:
+        images = load_images_cv2(img_ids, data_type)
     annotations = get_annotations_for_images(img_ids, data_type)
     positive_features = []
     negative_features = []
     idx = 0
-    for img_id, img in images:
+    for img_id, img in images.items():
         print('{} of {} for {}'.format(idx, len(images), category_id))
         idx += 1
         positive_bounding_boxes = [
@@ -56,21 +53,29 @@ def load_data_for_category(
             annotations[img_id]
             if annotation['category_id'] == category_id
         ]
-        for proposal in img_id_to_bboxes[img_id]:
+        for proposal in img_id_to_bboxes.get(img_id, []):
             is_a_positive_label = False
-            idx = 0
-            while idx < len(positive_bounding_boxes) and (
-                is_a_positive_label is False):
-                if iou(positive_bounding_boxes[idx], proposal) > 0.5:
+            i = 0
+            while i < len(positive_bounding_boxes) and (
+                    is_a_positive_label is False):
+                if iou(positive_bounding_boxes[i], proposal) > 0.5:
                     positive_features.append(
-                        {'bbox': proposal, 'img_id': img_id}
+                        {
+                            'bbox': proposal,
+                            'img_id': img_id,
+                            'image_shape': (img.shape[1], img.shape[0])
+                        }
                     )
                     is_a_positive_label = True
                 else:
-                    idx += 1
+                    i += 1
             if not is_a_positive_label:
                 negative_features.append(
-                    {'bbox': proposal, 'img_id': img_id}
+                    {
+                        'bbox': proposal,
+                        'img_id': img_id,
+                        'image_shape': (img.shape[1], img.shape[0])
+                    }
                 )
     file_path = positive_training_data_save_location.format(
         data_type, category_id)
@@ -87,32 +92,25 @@ def load_data_for_category(
 
 
 def get_img_id_to_bboxes(data_type):
-    img_ids, bboxes = load_bboxes_small(data_type=data_type)
+    if use_full_dataset:
+        img_ids, bboxes = load_bboxes_large(data_type=data_type)
+    else:
+        img_ids, bboxes = load_bboxes_small(data_type=data_type)
     img_id_to_bboxes = {}
     for img_id, bboxes_for_img in zip(img_ids, bboxes):
-        if img_id in img_id_to_bboxes:
-            img_id_to_bboxes[img_id] = np.concatenate(
-                [img_id_to_bboxes[img_id], bboxes_for_img]
-            )
-        else:
-            img_id_to_bboxes[img_id] = bboxes_for_img
+        if bboxes_for_img is not None:
+            if img_id in img_id_to_bboxes:
+                img_id_to_bboxes[img_id] = np.concatenate(
+                    [img_id_to_bboxes[img_id], bboxes_for_img]
+                )
+            else:
+                img_id_to_bboxes[img_id] = bboxes_for_img
     return img_id_to_bboxes
 
 
-
 if __name__ == '__main__':
-    data_type = 'train2014'
-    # data_type = 'val2014'
-    # data_type = 'test2014'
-    # idxes_for_node = list(range(4))
-    # idxes_for_node = list(range(4, 8))
-    # idxes_for_node = list(range(8, 13))
-    # idxes_for_node = list(range(13, 18))
-    # category_ids = get_hw3_categories('small', data_type)
-    # img_id_to_bboxes = get_img_id_to_bboxes(data_type)
-    # category_ids = [
-    #     cat for idx, cat in enumerate(category_ids) if idx in idxes_for_node
-    # ]
-    category_ids = [23]
-    for category_id in category_ids:
-        load_data_for_category(category_id, img_id_to_bboxes, data_type)
+    for data_type in ['train2014', 'val2014', 'test2014']:
+        category_ids = get_hw3_categories('small', data_type)
+        img_id_to_bboxes = get_img_id_to_bboxes(data_type)
+        for category_id in category_ids:
+            load_data_for_category(category_id, img_id_to_bboxes, data_type)
