@@ -1,5 +1,6 @@
 from collections import defaultdict
 import matplotlib.pyplot as plt
+from utils.aws_utils import upload_to_s3
 from PIL import Image, ImageDraw
 from pycocotools.coco import COCO
 from utils.redis_utils import cache
@@ -267,7 +268,6 @@ def features_from_img_id(data_type='train2014'):
     }
 
 
-@cache.cached(timeout=60 * 60 * 24 * 60)
 def features_from_img_id_large(data_type='train2014'):
     img_ids, feats = load_data_large(data_type)
     return {
@@ -443,13 +443,33 @@ def ensure_dir(directory):
         os.makedirs(directory)
 
 
+colors = [
+    (30, 144, 255),
+    (255, 140, 0),
+    (34, 139, 34),
+    (255, 0, 0),
+    (147, 112, 219),
+    (139, 69, 19),
+    (255, 20, 147),
+    (128, 128, 128),
+    (85, 107, 47),
+    (0, 255, 255)
+]
+
+
+def get_color(i):
+    return colors[i % len(colors)]
+
+
 def plot_bbox(
         bbox,
         img_id,
         data_type,
         is_large=False,
         save_fig=False,
-        save_prefix=''):
+        save_prefix='',
+        upload_img_to_s3=False,
+        category_id=2):
     coco = get_coco(data_type)
     img = coco.loadImgs([img_id])[0]
     if is_large:
@@ -457,10 +477,21 @@ def plot_bbox(
     img_pil = Image.open('%s/%s/%s' % (dataDir, data_type, img['file_name']))
     draw = ImageDraw.Draw(img_pil)
     x, y, w, h = bbox
-    draw.rectangle(((x, y, x + w, y + h)), fill=None, outline=(255, 0, 0))
+    draw.rectangle([(x, y), (x + w, y + h)], fill=None, outline=(240, 10, 40))
+    draw.rectangle([(x + 1, y + 1), (x + w, y + h)],
+                   fill=None, outline=(240, 10, 40))
+    draw.rectangle([(x, y), (x + w - 1, y + h - 1)],
+                   fill=None, outline=(240, 10, 40))
+    draw.rectangle([(x + 1, y + 1), (x + w - 1, y + h - 1)],
+                   fill=None, outline=(240, 10, 40))
     plt.imshow(img_pil)
     if save_fig:
         ensure_dir(dataDir + '/plots/')
-        plt.savefig(dataDir + save_prefix + 'bbox_{}.png'.format(img_id))
+        filename = save_prefix + 'bbox_{}.png'.format(img_id)
+        save_location = dataDir + '/plots/' + filename
+        plt.savefig(save_location)
+        if upload_img_to_s3:
+            upload_to_s3('data/images/' + filename, save_location)
+            # os.remove(save_location)
     else:
         plt.show()

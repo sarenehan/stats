@@ -14,7 +14,7 @@ import numpy as np
 from sklearn.metrics import average_precision_score
 
 
-use_full_dataset = False
+use_full_dataset = True
 if use_full_dataset:
     save_location = dataDir + '/hw3_model_results_for_category_{}_large.pkl'
 else:
@@ -105,7 +105,7 @@ def construct_batches(n_, batch_size):
 
 def compute_gradient(x, y, w, lambda_):
     preds = 1 / (1 + np.exp(-np.matmul(x, w)))
-    return (np.matmul((preds - y), x) / len(x)) + (lambda_ * w)
+    return (2 * (np.matmul((preds - y), x) / len(x))) + (lambda_ * w)
 
 
 def train_logistic_regression(
@@ -118,8 +118,6 @@ def train_logistic_regression(
         batch_size,
         w,
         v_t,
-        iter_init=0,
-        prev_w=None,
         max_iter=30000):
     iter_ = 0
     ap_score = 0
@@ -127,12 +125,10 @@ def train_logistic_regression(
     val_errors = []
     train_ap_scores = []
     val_ap_scores = []
-    if prev_w is None:
-        prev_w = np.zeros(len(w))
     n_ = len(x_train)
     half_epoch = (int(len(x_train) / (2 * batch_size))) + 1
-    # iter_ = iter_init
-    while iter_ < iter_init + max_iter:
+    grad_norm = float('inf')
+    while (iter_ < max_iter) and (grad_norm > 1):
         batches = construct_batches(n_, batch_size)
         for idx, batch in enumerate(batches):
             if idx % half_epoch == 0:
@@ -144,28 +140,18 @@ def train_logistic_regression(
                         w, lambda_, x_val, y_val)
                 )
                 ap_score_val = get_average_precision_score(x_val, y_val, w)
-                # print('{}'.format(iter_))
-                # print('\tTrain Error: {}'.format(total_error))
-                # print('\tTrain AP Score: {}'.format(ap_score))
-                # print('\tVal Error: {}'.format(total_error_val))
-                # print('\tVal AP Score: {}'.format(ap_score_val))
+                print('{}'.format(iter_))
+                print('\tTrain Error: {}'.format(total_error))
+                print('\tTrain AP Score: {}'.format(ap_score))
+                print('\tVal Error: {}'.format(total_error_val))
+                print('\tVal AP Score: {}'.format(ap_score_val))
                 grad_norm = np.linalg.norm(compute_gradient(
                     x_train, y_train, w, lambda_))
-                # print('\tGrad norm: {}'.format(grad_norm))
+                print('\tGrad norm: {}'.format(grad_norm))
                 train_errors.append(total_error)
                 val_errors.append(total_error_val)
                 train_ap_scores.append(ap_score)
                 val_ap_scores.append(ap_score_val)
-                if grad_norm < 4:
-                    return (
-                        w,
-                        v_t,
-                        train_errors,
-                        val_errors,
-                        train_ap_scores,
-                        val_ap_scores,
-                        iter_
-                    )
             # Nesterov momentum
             grad = compute_gradient(
                 x_train[batch], y_train[batch], w - (0.9 * v_t), lambda_)
@@ -200,11 +186,11 @@ def predict_numpy(x, w):
 def determine_negative_features(x, y, w, data_type):
     positive_indices = np.where(y == 1)[0]
     negative_indices = np.where(y == 0)[0]
-    if len(negative_indices) > 100000:
-        negative_indices = np.random.choice(
-            negative_indices,
+    if len(positive_indices) > 10000:
+        positive_indices = np.random.choice(
+            positive_indices,
             replace=False,
-            size=100000)
+            size=10000)
         all_indices = np.concatenate(
             [positive_indices, negative_indices]
         )
@@ -212,6 +198,24 @@ def determine_negative_features(x, y, w, data_type):
         x = x[all_indices]
         positive_indices = np.where(y == 1)[0]
         negative_indices = np.where(y == 0)[0]
+    if len(negative_indices) > 100000:
+        new_negative_indices = np.random.choice(
+            negative_indices,
+            replace=False,
+            size=100000)
+        neg_index_to_init_neg_index = {
+            idx: neg_index for idx, neg_index in enumerate(negative_indices)
+        }
+        negative_indices = new_negative_indices
+        all_indices = np.concatenate(
+            [positive_indices, negative_indices]
+        )
+        y = y[all_indices]
+        x = x[all_indices]
+        positive_indices = np.where(y == 1)[0]
+        negative_indices = np.where(y == 0)[0]
+    else:
+        neg_index_to_init_neg_index = dict(enumerate(negative_indices))
     if use_full_dataset:
         get_features_for_bboxes_large(x, data_type)
     else:
@@ -226,6 +230,10 @@ def determine_negative_features(x, y, w, data_type):
         hard_negative_indices_to_use = [
             negative_indices[idx] for idx, prediction
             in sorted_preds_with_indices[-len(positive_indices):]
+        ]
+        hard_negative_indices_to_return = [
+            neg_index_to_init_neg_index[idx] for idx in
+            hard_negative_indices_to_use
         ]
         random_neg_indices_to_use = np.random.choice(
             list(set(negative_indices).difference(
@@ -242,12 +250,12 @@ def determine_negative_features(x, y, w, data_type):
             replace=False,
             size=len(positive_indices) * 2
         )
-        hard_negative_indices_to_use = None
+        hard_negative_indices_to_return = None
         total_ap_score = None
     indices_to_use = np.concatenate([neg_indices_to_use, positive_indices])
     x = x[indices_to_use]
     y = y[indices_to_use]
-    return x, y, total_ap_score, hard_negative_indices_to_use
+    return x, y, total_ap_score, hard_negative_indices_to_return
 
 
 def plot_some_hard_negatives(train, hard_negative_idxs, i):
@@ -263,8 +271,11 @@ def plot_some_hard_negatives(train, hard_negative_idxs, i):
             img_id,
             'train2014',
             is_large=use_full_dataset,
-            save_fig=False,
-            save_prefix='hard_negatives_round_{}_{}'.format(i + 1, idx + 1))
+            save_fig=True,
+            save_prefix='hard_negatives_cat_id_{}_round_{}_{}_'.format(
+                category_id, i + 1, idx + 1),
+            upload_img_to_s3=True,
+            category_id=category_id)
 
 
 def train_model(
@@ -301,20 +312,21 @@ def train_model(
     total_val_ap_scores = []
     ws = [w]
     for i in range(10):
-        x_train, y_train, total_train_ap_score, hard_negative_idxs = determine_negative_features(
-            *preprocess_data(train), w, 'train2014')
-        x_val, y_val, total_val_ap_score, _  = determine_negative_features(
-            *preprocess_data(val), w, 'val2014')
+        x_train, y_train, total_train_ap_score, hard_negative_idxs = \
+            determine_negative_features(
+                *preprocess_data(train), w, 'train2014')
+        x_val, y_val, total_val_ap_score, _ = \
+            determine_negative_features(*preprocess_data(val), w, 'val2014')
         plot_some_hard_negatives(train, hard_negative_idxs, i)
         total_train_ap_scores.append(total_train_ap_score)
         total_val_ap_scores.append(total_val_ap_score)
         (
             w,
             v_t,
-            train_errors,
-            val_errors,
-            train_ap_scores,
-            val_ap_scores,
+            _,
+            _,
+            _,
+            _,
             iter_
         ) = train_logistic_regression(
             x_train,
@@ -325,12 +337,8 @@ def train_model(
             training_rate,
             batch_size,
             w,
-            v_t,
-            iter_init=iter_,
-            prev_w=w)
+            v_t)
         ws.append(w)
-        train_ap_scores_list.extend(train_ap_scores)
-        val_ap_scores_list.extend(val_ap_scores)
     return (
         ws,
         train_errors_list,
@@ -345,7 +353,7 @@ def train_model(
 def train_and_save_model_for_category(category_id):
     print('Generating model for cat id {}'.format(category_id))
     train, val = load_data_for_category(category_id)
-    lambda_ = 1
+    lambda_ = 10
     training_rate = 0.000001
     batch_size = 10
     print('Lambda: {}'.format(lambda_))
