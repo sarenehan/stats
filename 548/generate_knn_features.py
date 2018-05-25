@@ -5,8 +5,8 @@ from utils.coco_utils import (
     get_annotations_for_images,
     dataDir,
     get_hw3_categories,
-    load_bboxes_small,
-    load_bboxes_large,
+    load_knn_bboxes_small,
+    load_knn_bboxes_large,
     iou,
 )
 import numpy as np
@@ -14,14 +14,14 @@ from utils.aws_utils import upload_to_s3
 import os
 import pickle
 
-use_full_dataset = True
+use_full_dataset = False
 max_bytes = 2**31 - 1
 if use_full_dataset:
     positive_training_data_save_location = dataDir + \
-        '/small2_{}_feature_{}.pkl'
+        '/small2_{}_knn_features_{}.pkl'
 else:
     positive_training_data_save_location = dataDir + \
-        '/small_{}_feature_{}.pkl'
+        '/small_{}_knn_features_{}.pkl'
 
 
 def pickle_big_data(data, file_path):
@@ -93,9 +93,9 @@ def load_data_for_category(
 
 def get_img_id_to_bboxes(data_type):
     if use_full_dataset:
-        img_ids, bboxes = load_bboxes_large(data_type=data_type)
+        img_ids, bboxes = load_knn_bboxes_large(data_type=data_type)
     else:
-        img_ids, bboxes = load_bboxes_small(data_type=data_type)
+        img_ids, bboxes = load_knn_bboxes_small(data_type=data_type)
     img_id_to_bboxes = {}
     for img_id, bboxes_for_img in zip(img_ids, bboxes):
         if bboxes_for_img is not None:
@@ -110,7 +110,7 @@ def get_img_id_to_bboxes(data_type):
 
 if __name__ == '__main__':
     category_ids = get_hw3_categories('small', 'train2014')
-    for data_type in ['test2014']:
+    for data_type in ['train2014', 'val2014', 'test2014']:
         img_id_to_bboxes = get_img_id_to_bboxes(data_type)
         for category_id in category_ids:
             load_data_for_category(category_id, img_id_to_bboxes, data_type)

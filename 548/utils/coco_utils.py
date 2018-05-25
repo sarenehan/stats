@@ -260,6 +260,28 @@ def load_bboxes_large(data_type='train2014'):
     return img_list, feats
 
 
+def load_knn_bboxes_small(data_type='train2014'):
+    file_location = os.path.join(
+        dataDir, 'bboxes_retrieval', '{}_bboxes_retrieval.p'.format(data_type)
+    )
+    with open(file_location, 'rb') as f:
+        u = pickle._Unpickler(f)
+        u.encoding = 'latin1'
+        [img_list, feats] = u.load()
+    return img_list, feats
+
+
+def load_knn_bboxes_large(data_type='train2014'):
+    file_location = os.path.join(
+        dataDir, 'bboxes_retrieval2', '{}_bboxes_retrieval.p'.format(data_type)
+    )
+    with open(file_location, 'rb') as f:
+        u = pickle._Unpickler(f)
+        u.encoding = 'latin1'
+        [img_list, feats] = u.load()
+    return img_list, feats
+
+
 @cache.cached(timeout=60 * 60 * 24 * 60)
 def features_from_img_id(data_type='train2014'):
     img_ids, feats = load_data_small(data_type)
@@ -492,6 +514,6 @@ def plot_bbox(
         plt.savefig(save_location)
         if upload_img_to_s3:
             upload_to_s3('data/images/' + filename, save_location)
-            # os.remove(save_location)
+            os.remove(save_location)
     else:
         plt.show()

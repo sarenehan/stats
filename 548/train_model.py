@@ -43,7 +43,7 @@ def save_results_to_s3(
     with open(model_save_location, 'wb') as f:
         pickle.dump(dict_to_save, f)
     upload_to_s3(
-        'data/hw3_models/' + model_save_location.split('/')[-1],
+        'data/final_project_models/' + model_save_location.split('/')[-1],
         model_save_location
     )
     os.remove(model_save_location)
@@ -118,9 +118,9 @@ def train_logistic_regression(
         batch_size,
         w,
         v_t,
-        max_iter=30000):
+        max_iter=60):
+    n_half_ephocs = 0
     iter_ = 0
-    ap_score = 0
     train_errors = []
     val_errors = []
     train_ap_scores = []
@@ -128,10 +128,11 @@ def train_logistic_regression(
     n_ = len(x_train)
     half_epoch = (int(len(x_train) / (2 * batch_size))) + 1
     grad_norm = float('inf')
-    while (iter_ < max_iter) and (grad_norm > 1):
+    while (n_half_ephocs < max_iter) and (grad_norm > 1):
         batches = construct_batches(n_, batch_size)
         for idx, batch in enumerate(batches):
             if idx % half_epoch == 0:
+                n_half_ephocs += 1
                 total_error = float(compute_error_logistic_regression(
                     w, lambda_, x_train, y_train))
                 ap_score = get_average_precision_score(x_train, y_train, w)
@@ -140,7 +141,7 @@ def train_logistic_regression(
                         w, lambda_, x_val, y_val)
                 )
                 ap_score_val = get_average_precision_score(x_val, y_val, w)
-                print('{}'.format(iter_))
+                print('{}'.format(n_half_ephocs))
                 print('\tTrain Error: {}'.format(total_error))
                 print('\tTrain AP Score: {}'.format(ap_score))
                 print('\tVal Error: {}'.format(total_error_val))
@@ -204,7 +205,8 @@ def determine_negative_features(x, y, w, data_type):
             replace=False,
             size=100000)
         neg_index_to_init_neg_index = {
-            idx: neg_index for idx, neg_index in enumerate(negative_indices)
+            idx: neg_index for idx, neg_index in enumerate(
+                new_negative_indices)
         }
         negative_indices = new_negative_indices
         all_indices = np.concatenate(
@@ -215,9 +217,9 @@ def determine_negative_features(x, y, w, data_type):
         positive_indices = np.where(y == 1)[0]
         negative_indices = np.where(y == 0)[0]
     else:
-        neg_index_to_init_neg_index = dict(enumerate(negative_indices))
+        neg_index_to_init_neg_index = {x: x for x in negative_indices}
     if use_full_dataset:
-        get_features_for_bboxes_large(x, data_type)
+        x = get_features_for_bboxes_large(x, data_type)
     else:
         x = get_features_for_bboxes(x, data_type)
     # x = np.hstack((np.ones((len(x), 1)), x))  # for the intercept...
@@ -379,12 +381,13 @@ def train_and_save_model_for_category(category_id):
 
 
 if __name__ == '__main__':
-    # idxes_for_node = list(range(9))
-    # idxes_for_node = list(range(9, 18))
-    # category_ids = get_hw3_categories('small', data_type)
+    # idxes_for_node = list(range(4))
+    # idxes_for_node = list(range(4, 8))
+    # idxes_for_node = list(range(8, 13))
+    # idxes_for_node = list(range(13, 18))
+    category_ids = get_hw3_categories('small', 'train2014')
     # category_ids = [
     #     cat for idx, cat in enumerate(category_ids) if idx in idxes_for_node
     # ]
-    category_ids = [2]
     for category_id in category_ids:
         train_and_save_model_for_category(category_id)
