@@ -181,13 +181,19 @@ def preprocess_data(data):
 
 
 def predict_numpy(x, w):
-    return 1 / (1 + np.exp(-np.matmul(x, w)))
+    return np.array(
+        [
+            1 / (1 + np.exp(-np.dot(x[idx], w)))
+            for idx in range(len(x))
+        ]
+    )
 
 
 def determine_negative_features(x, y, w, data_type):
     positive_indices = np.where(y == 1)[0]
     negative_indices = np.where(y == 0)[0]
     if len(positive_indices) > 10000:
+        pos_offset = len(positive_indices) - 10000
         positive_indices = np.random.choice(
             positive_indices,
             replace=False,
@@ -199,18 +205,20 @@ def determine_negative_features(x, y, w, data_type):
         x = x[all_indices]
         positive_indices = np.where(y == 1)[0]
         negative_indices = np.where(y == 0)[0]
+    else:
+        pos_offset = 0
     if len(negative_indices) > 100000:
+        n_positive = len(positive_indices)
         new_negative_indices = np.random.choice(
             negative_indices,
             replace=False,
             size=100000)
         neg_index_to_init_neg_index = {
-            idx: neg_index for idx, neg_index in enumerate(
-                new_negative_indices)
+            idx + n_positive: neg_idx
+            for idx, neg_idx in enumerate(new_negative_indices)
         }
-        negative_indices = new_negative_indices
         all_indices = np.concatenate(
-            [positive_indices, negative_indices]
+            [positive_indices, new_negative_indices]
         )
         y = y[all_indices]
         x = x[all_indices]
@@ -234,7 +242,7 @@ def determine_negative_features(x, y, w, data_type):
             in sorted_preds_with_indices[-len(positive_indices):]
         ]
         hard_negative_indices_to_return = [
-            neg_index_to_init_neg_index[idx] for idx in
+            neg_index_to_init_neg_index[idx] + pos_offset for idx in
             hard_negative_indices_to_use
         ]
         random_neg_indices_to_use = np.random.choice(
@@ -385,7 +393,7 @@ if __name__ == '__main__':
     # idxes_for_node = list(range(4, 8))
     # idxes_for_node = list(range(8, 13))
     # idxes_for_node = list(range(13, 18))
-    category_ids = get_hw3_categories('small', 'train2014')
+    category_ids = get_hw3_categories('small', 'train2014')[13:16]
     # category_ids = [
     #     cat for idx, cat in enumerate(category_ids) if idx in idxes_for_node
     # ]

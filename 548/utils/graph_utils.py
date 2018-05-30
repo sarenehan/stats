@@ -27,3 +27,22 @@ def draw_train_and_dev_errors_over_time(
         plt.savefig(default_graph_save_location_dir + title + '.png')
     else:
         plt.show()
+
+
+def draw_scatterplot(
+        x,
+        y,
+        xlabel='',
+        ylabel='',
+        title='',
+        color='b',
+        save_location=None):
+    plt.scatter(x, y, color=color)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    if save_location:
+        plt.savefig(save_location)
+        plt.close("all")
+    else:
+        plt.show()

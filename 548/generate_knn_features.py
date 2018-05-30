@@ -14,7 +14,7 @@ from utils.aws_utils import upload_to_s3
 import os
 import pickle
 
-use_full_dataset = False
+use_full_dataset = True
 max_bytes = 2**31 - 1
 if use_full_dataset:
     positive_training_data_save_location = dataDir + \
