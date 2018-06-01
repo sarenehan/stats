@@ -1,3 +1,0 @@
-ipython lsh_predict.py
-ipython train_locality_sensitive_hashing.py
-ipython lsh_predict_2.py

@@ -163,7 +163,7 @@ def predict(bbox_to_predict, hash_functions, K=K):
     distances = [float(neighbor[1]) for neighbor in neighbors_with_dist[:K]]
     output = np.zeros(len(category_ids))
     for pred, n_occurences in Counter(preds).items():
-        output[cat_id_to_idx[pred]] = n_occurences / K
+        output[cat_id_to_idx[pred]] = n_occurences / len(preds)
     return output, distances, len(neighbors)
 
 
@@ -260,23 +260,17 @@ def plot_map_vs_k():
 def get_test_error():
     hash_functions = load_hash_functions()[:7]
     category_id_to_info_dict = category_id_to_info()
-    y = []
-    preds = []
     cat_ids = []
     ap_scores = []
     categories = []
     super_categories = []
-    for category_id in get_hw3_categories('small', 'test2014'):
+    for category_id in get_hw3_categories('small', 'train2014'):
         data = load_data_for_category(category_id)
         preds_for_category = []
         labels_for_category = []
         for idx, bbox in enumerate(data):
             print('{} of {}'.format(idx, len(data)))
-            y_row = np.zeros(len(category_ids))
-            y_row[cat_id_to_idx[bbox['category_id']]] = 1
-            y.append(y_row)
             pred_row, _, _ = predict(bbox, hash_functions)
-            preds.append(pred_row)
             preds_for_category.append(pred_row[cat_id_to_idx[category_id]])
             labels_for_category.append(int(bbox['category_id'] == category_id))
         ap_score_for_category = average_precision_score(

@@ -361,7 +361,6 @@ def enocode_feature_set(y, unique_features):
 
 @cache.cached(timeout=60 * 60 * 24 * 60)
 def get_hw3_categories(size, data_type):
-    return [2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
     file_location = os.path.join(
         dataDir, 'features_{}'.format(size), '{}.p'.format(data_type)
     )

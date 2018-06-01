@@ -139,9 +139,4 @@ def get_test_errors():
 
 
 if __name__ == '__main__':
-    ap_scores = []
-    for category_id in get_hw3_categories('small', 'train2014'):
-        ap_score = get_test_ap_for_category(category_id)
-        print('{}: {}'.format(category_id, ap_score))
-        ap_scores.append(ap_score)
-    print('\n\nMean ap score: {}'.format(mean(ap_scores)))
+    get_test_errors()

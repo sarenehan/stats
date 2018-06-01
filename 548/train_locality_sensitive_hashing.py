@@ -199,7 +199,7 @@ def populate_sqllite_table():
             insert_bbox_row(bbox, c, id_)
             for idx, hash_function in enumerate(hash_functions):
                 hash_ = tuple(
-                    np.round(
+                    np.floor(
                         np.matmul(hash_function, features) / r_).astype(int)
                 )
                 insert_hash_row(hash_, idx, id_, c)
@@ -226,7 +226,7 @@ def determine_k():
         for i, bbox in enumerate(train_bboxes):
             features = extract_features_from_bbox(bbox)
             hash_ = tuple(
-                np.round(
+                np.floor(
                     np.matmul(hash_function, features) / r_).astype(int)
             )
             train_hash_dict[hash_] += 1
@@ -266,7 +266,7 @@ def predict(bbox_to_predict, hash_functions, train_hash_dict):
     features = extract_features_from_bbox(bbox_to_predict, 'val2014')
     for idx, hash_function in enumerate(hash_functions):
         hash_ = tuple(
-            np.round(
+            np.floor(
                 np.matmul(hash_function, features) / r_).astype(int)
         )
         neighbors.extend(train_hash_dict[idx][hash_])
@@ -293,7 +293,7 @@ def determine_l():
             features = extract_features_from_bbox(bbox, 'train2014')
             for idx, hash_function in enumerate(hash_functions):
                 hash_ = tuple(
-                    np.round(
+                    np.floor(
                         np.matmul(hash_function, features) / r_).astype(int)
                 )
                 train_hash_dict[idx][hash_].append(bbox)
@@ -306,7 +306,7 @@ def determine_l():
             features = extract_features_from_bbox(bbox, 'val2014')
             for idx, hash_function in enumerate(hash_functions):
                 hash_ = tuple(
-                    np.round(
+                    np.floor(
                         np.matmul(hash_function, features) / r_).astype(int)
                 )
                 neighbors.extend(train_hash_dict[idx][hash_])
