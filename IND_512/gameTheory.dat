@@ -1,0 +1,13 @@
+data;
+set ROWS:= P S R;
+set COLS:= P S R;
+param A: P  S  R:=
+      P  0  1  -2
+      S  -3  0  4
+      R  5  -6  0
+      ;
+      
+solve;
+printf {j in COLS}: "   %3s %10.7f\n", j, 102*x[j];
+printf {i in ROWS}: "   %3s %10.7f\n", i, 102*ineqs[i];
+printf: "Value = %10.7f\n", 102*v;

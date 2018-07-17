@@ -44,8 +44,8 @@ def get_retrieval_data(data, category_id):
     for bbox in negative_features:
         bbox['category_id'] = 0
         data_to_return.append(bbox)
-    if len(data_to_return) > 1000:
-        data_to_return = random.sample(data_to_return, 1000)
+    if len(data_to_return) > 10000:
+        data_to_return = random.sample(data_to_return, 10000)
     return np.array(data_to_return)
 
 
@@ -271,8 +271,11 @@ def get_test_error():
         for idx, bbox in enumerate(data):
             print('{} of {}'.format(idx, len(data)))
             pred_row, _, _ = predict(bbox, hash_functions)
-            preds_for_category.append(pred_row[cat_id_to_idx[category_id]])
-            labels_for_category.append(int(bbox['category_id'] == category_id))
+            pred = pred_row[cat_id_to_idx[category_id]]
+            label = int(bbox['category_id'] == category_id)
+            if pred > 0 or label == 1:
+                preds_for_category.append(pred)
+                labels_for_category.append(label)
         ap_score_for_category = average_precision_score(
             labels_for_category, preds_for_category)
         print('Average Precision Score for {}: {}'.format(

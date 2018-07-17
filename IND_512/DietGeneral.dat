@@ -1,0 +1,50 @@
+data;
+
+####
+#Definig the Sets
+set Foods :=a b c d;
+set Nutritions:= Calories Chocolate Suger Fat;
+
+
+###
+#Defining the parameters 
+param A:        a     b    c     d:=
+      Calories  400  200   150   500
+      Chocolate  3    2     0     0
+      Suger      2    2     4     4
+      Fat        2    4     1     5;
+      
+param C:= 
+a 50 b 20 c 30 d 80;
+
+param b:=
+Calories 500 Chocolate 6 Suger 10 Fat 8;
+
+###
+#Calling the solver. (need 'cplex' specifically if sensitivity analysis is applied)  
+option solver cplex; 
+
+#requesting a sensitivity analysis
+option cplex_options 'sensitivity' ;
+
+#request to sovlve
+solve;
+
+##
+#request to show the optimal values 
+display {i in Foods}: x[i];
+display :sum {i in Foods} C[i]*x[i];
+
+#request to display the sensitivity analysis values
+
+print 'Reduced costs:'; 
+display {i in Foods}: x[i].rc;
+print 'shadow prices:';
+display {j in Nutritions}: NutLimit[j];
+print 'upper and lower bound of the problem coefficient so that the current optimal basis remains optimal'; 
+display {i in Foods}: x[i].up;
+display {i in Foods}: x[i].down;
+print 'right hand side lower and upper bound so that the current optimal basis remains optimal';
+display {j in Nutritions}: NutLimit[j].up;
+display {j in Nutritions}: NutLimit[j].down;
+

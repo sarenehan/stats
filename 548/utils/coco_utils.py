@@ -321,7 +321,7 @@ def load_data_small_supercategory(data_type):
 
 def load_data_tiny_supercategory(data_type):
     file_location = os.path.join(
-        dataDir, 'features_tiny', '{}.p'.format(data_type)
+        dataDir, 'features_small', '{}.p'.format(data_type)
     )
     with open(file_location, 'rb') as f:
         u = pickle._Unpickler(f)

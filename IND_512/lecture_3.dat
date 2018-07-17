@@ -1,0 +1,26 @@
+data;
+set ROWS:= O T;
+set COLS:= O T;
+param A: O  T:=
+      O  -2  3
+      T  3  -4
+      ;
+
+solve;
+printf {j in COLS}: "   %3s %10.7f\n", j, 100*x[j];
+printf {i in ROWS}: "   %3s %10.7f\n", i, 100*ineqs[i];
+printf: "Value = %10.7f\n", 100*v;
+
+# Results:
+# 1 iterations, objective 0.08333333333
+#      O 58.3333333
+#      T 41.6666667
+#      O 58.3333333
+#      T 41.6666667
+# Value =  8.3333333
+
+# Since the value of the game is nonzero, the game is not "fair". It has
+# an advantage for the "odd" player, or column player or 8.33 per 100 games.
+
+# The results show that both players should choose one 58.33% of the time, and
+# two 41.67% of the time to play optimally.

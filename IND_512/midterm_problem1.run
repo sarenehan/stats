@@ -1,0 +1,2 @@
+model RENEHAN_EXAMPROB1.mod;
+data RENEHAN_EXAMPROB1.dat;

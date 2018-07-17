@@ -79,7 +79,13 @@ def get_test_ap_for_category(category_id):
     test_x, test_y = get_test_data_to_predict(category_id)
     w = get_w_for_best_predictor(category_id)
     preds = predict(test_x, w)
-    return average_precision_score(test_y, preds)
+    actual_for_ap_score = []
+    pred_for_ap_score = []
+    for pred, label in zip(preds, test_y):
+        if pred > 0.2 or label == 1:
+            actual_for_ap_score.append(label)
+            pred_for_ap_score.append(pred)
+    return average_precision_score(actual_for_ap_score, pred_for_ap_score)
 
 
 def draw_optimization_graphs_for_cat_2():

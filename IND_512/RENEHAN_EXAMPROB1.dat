@@ -1,0 +1,14 @@
+data;
+set ROWS:= one_two one_three two_three two_four;
+set COLS:= one_two one_three two_three two_four;
+param A: one_two one_three two_three two_four:=
+one_two        0        -2         3        0
+one_three      2         0         0        -3
+two_three     -3         0         0        4
+two_four       0         3        -4        0
+      ;
+
+solve;
+printf {j in COLS}: "   %3s %10.7f\n", j, 100*x[j];
+printf {i in ROWS}: "   %3s %10.7f\n", i, 100*ineqs[i];
+printf: "Value = %10.7f\n", v;
