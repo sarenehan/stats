@@ -11,4 +11,4 @@ two_four       0         3        -4        0
 solve;
 printf {j in COLS}: "   %3s %10.7f\n", j, 100*x[j];
 printf {i in ROWS}: "   %3s %10.7f\n", i, 100*ineqs[i];
-printf: "Value = %10.7f\n", v;
+printf: "Value = %10.7f\n", u;

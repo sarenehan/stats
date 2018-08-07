@@ -1,0 +1,18 @@
+data;
+
+set projects:= A B C D E F G;
+set resources:= Managers Earthmovers Insurane;
+
+param h:   A  B  C  D  E F  G=
+Managers    9  11 13 14 5 17 8
+Earthmovers 5  4  1  6  2 9  8
+Insurane    11 7  15 25 6 9  14;
+
+param b:=  Managers 35 Earthmovers 15 Insurane 40;
+
+param p:= A 2 B 1 C 1.5 D 3.4 E 0.7 F 4.1 G 2.3 ;
+
+option solver cplex;
+solve;
+display x;
+display profit;

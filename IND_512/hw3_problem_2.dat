@@ -1,0 +1,24 @@
+data;
+
+set customer:= C1 C2 C3 C4 C5;
+set warehouse:= W1 W2 W3 W4;
+
+param h: C1 C2 C3 C4 C5=
+W1        8 12  6 15  9
+W2       11 17  3  4  7
+W3        9 17 10  2  6
+W4       15 20  5 12  3;
+
+param demand C1 20 C2 30 C3 40 C4 50 C5 20;
+param setupCost :=
+W1 1000
+W2 1000
+W3 1000
+W4 1000;
+
+
+option solver cplex;
+solve;
+display x;
+display cost;
+display production;

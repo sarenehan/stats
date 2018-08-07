@@ -1,0 +1,11 @@
+data;
+
+set items:= bedroom dining_room stereo sofa tv;
+
+param v:= bedroom 60 dining_room 48 stereo 14 sofa 31 tv 10;
+param r:= bedroom 800 dining_room 600 stereo 300 sofa 400 tv 200;
+
+option solver cplex;
+solve;
+display x;
+display value;
