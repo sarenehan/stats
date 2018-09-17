@@ -19,15 +19,33 @@ sum{(i,k) in arcs} flow[i,k]=sum{(k,j) in arcs}flow[k,j];
 
 data;
 
-set nodes:= s a b c d t;
+set nodes:= s job_1 job_2 job_3 job_4 t01 t12 t23 t35 t56 t67 t;
 
 param orig:= s;
 param dest:= t;
 
 param: arcs: cap:=
-s a 10 a c 20 b d 35 c d 40 d t 20
-s b 25 a b 35        c t 30
-       a d 15              ;
+s job_1 2.5
+s job_2 2.1
+s job_3 3.1
+s job_4 1.8
+job_3 t01 2
+job_3 t12 2
+job_3 t23 2
+job_3 t35 4
+job_3 t56 2
+job_1 t12 2
+job_1 t23 2
+job_2 t56 2
+job_2 t67 2
+job_4 t23 2
+job_4 t35 4
+t01 t 2
+t12 t 2
+t23 t 2
+t35 t 4
+t56 t 2
+t67 t 2;
 
 solve;
 display flow;

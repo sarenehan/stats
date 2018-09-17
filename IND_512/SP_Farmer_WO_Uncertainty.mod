@@ -1,0 +1,33 @@
+reset;
+
+param yield_wheat=2.5;
+param yield_corn=3;
+param yield_bean=20;
+
+var x1 >=0; # acres of wheat
+var x2 >=0; # acres of corn
+var x3 >=0; # acres of beans
+
+var w1>=0; # Sold wheat
+var w2>=0; # sold corn
+var w3>=0 <=6000; #sold bean
+var w4>=0; #bean sold
+
+var y1>=0; #purchase wheat
+var y2>=0; #purchase corn
+
+maximize return: 170*w1+150*w2+36*w3+10*w4
+-(150*x1+230*x2+260*x3)-(238*y1+210*y2);
+
+subject to
+area: x1+x2+x3<=500;
+excess_wheat: w1<=yield_wheat*x1-200+y1;
+excess_corn: w2<=yield_corn*x2-240+y2;
+
+purchased_wheat: y1>=200-yield_wheat*x1;
+purchased_corn: y2>=240-yield_corn*x2;
+
+total_bean: yield_bean*x3=w3+w4;
+
+solve; 
+display x1, x2,x3, w1,w2,w3,w4,y1,y2;
