@@ -10,19 +10,54 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 #### a)
+We take the derivative of a with respect to the value we are attempting to minimize:
+$$\frac{d}{da}[\lvert y - X a \rvert ^ 2 + \lambda a^T \Omega a] = - 2 X^T ( y - X a ) + 2 \lambda \Omega a$$
 
-$\frac{3}{5}$
+$$2 X^T X a + 2 \lambda \Omega a = 2 X^T y$$
 
-```{r cars}
-summary(cars)
+$$a (X^T X + \lambda \Omega) = X^T y$$
+
+$$\hat{a} = (X^T X + \lambda \Omega)^{-1} X^T y$$
+
+Plugging this into
+
+$$\hat{y} = X\hat{a}$$
+
+gives:
+
+$$\hat{y} = X (X^T X + \lambda \Omega)^{-1} X^T y $$
+
+
+#### b)
+
+```{r}
+source('/Users/stewart/projects/stats/527/homework_3_test_data.R')
+require(MASS)
+truncated.power.design.matrix <- function() {
+  design.matrix = matrix(0, ncol=length(x), nrow=length(x));
+  design.matrix[, length(x)] = 1;
+  for (i in 1:length(x) - 1) {
+    design.matrix[i:length(x), i] = (x - x[i])[i:length(x)]
+  }
+  return(design.matrix);
+}
+X = truncated.power.design.matrix();
+Omega = diag(length(x));
+Omega[1, 1] = 0;
+Omega[length(x), length(x)] = 0;
+get.fitted.values <- function(lambda) {
+  return(X %*% ginv((t(X) %*% X + (lambda * Omega))) %*% t(X) %*% y)
+}
+
+for (lambda in c(0, 1, 10)) {
+  plot(x, get.fitted.values(lambda), ylab='Fitted Value', xlab='x', main=paste0('Fitted Values for Lambda = ', lambda))
+}
+plot(x, get.fitted.values(10^6), ylab='Fitted Value', xlab='x', main=paste0('Fitted Values for Lambda = ', lambda))
+abline(lm(y~x))
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+The line for $\lambda = 10^6$ is equal to the regression line, as shown above.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+#### c)
+https://stats.stackexchange.com/questions/324642/invertibility-in-reinsch-form-derivation-smoothing-splines

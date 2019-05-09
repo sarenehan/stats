@@ -1,0 +1,244 @@
+---
+title: "homework2"
+author: "Stewart Renehan"
+date: "5/3/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### a)
+
+```{r}
+source('~/Desktop/home2-test-data.R')
+truncated.power.design.matrix <- function() {
+  design.matrix = matrix(0, ncol=length(x), nrow=length(x));
+  design.matrix[, length(x)] = 1;
+  for (i in 1:length(x) - 1) {
+    design.matrix[i:length(x), i] = (x - x[i])[i:length(x)]
+  }
+  return(design.matrix);
+}
+```
+
+#### b)
+
+```{r}
+# install.packages('leaps')
+require('leaps')
+# help(leaps)
+
+regsubsets.fitted.values <- function(X, regsubsets.out, nterm, selection_method="forward") {
+  optimal_features = summary(
+    regsubsets(x=X, y=regsubsets.out, method=selection_method, nvmax=nterm, intercept = F)
+  )$which[nterm,];
+  coef_vector = rep(0, length(regsubsets.out));
+  fitted.values = lm(regsubsets.out ~ X[,optimal_features] - 1)$coefficients
+  coef_vector[optimal_features] = fitted.values
+  return(coef_vector);
+}
+```
+
+#### c)
+
+```{r}
+rss_vector = rep(0, length(y1));
+X = truncated.power.design.matrix()
+for (nterm in 1:length(y1)) {
+  coef_vector = regsubsets.fitted.values(X, y1, nterm)
+  rss_vector[nterm] = sum(((X %*% coef_vector) - y1) ^ 2) / length(y1)
+}
+plot(rss_vector, 
+     ylab="Resubstitution RSS", 
+     xlab="N Features", 
+     main="Resubstitution RSS vs N Features")
+```
+
+#### d) 
+
+```{r}
+gcv_vector = rep(0, length(y1));
+X = truncated.power.design.matrix()
+for (nterm in 1:length(y1)) {
+  coef_vector = regsubsets.fitted.values(X, y1, nterm)
+  gcv_vector[nterm] = (sum(((X %*% coef_vector) - y1) ^ 2) / length(y1)) / (
+    1 - (nterm / length(y1)));
+}
+plot(gcv_vector, ylab="GCV Score", xlab="N Features", main="GCV Score vs N Features")
+```
+
+We see here that the GCV score is continuously decreaseing with the number of basis functions. This means the GCV score is basically useless, as it gives no information about the number of basis functions that optimizes the bias / variance tradeoff. In other words, the GCV score gives us basically no information about how more basis functions increases the variance of a model.
+
+
+#### e) 
+```{r}
+gcv_vector_3dof = rep(0, length(y1));
+X = truncated.power.design.matrix()
+for (nterm in 1:length(y1)) {
+  coef_vector = regsubsets.fitted.values(X, y1, nterm)
+  gcv_vector_3dof[nterm] = (sum(((X %*% coef_vector) - y1) ^ 2) / length(y1)) / (
+    1 - (3 * (nterm / length(y1))));
+}
+plot(gcv_vector_3dof,
+     ylab="GCV Score With 3 DOF", 
+     xlab="N Features", 
+     main="GCV Score With 3 DOF Penalty vs N Features")
+```
+
+Charging 3 degrees of freedom solves the problem somewhat, as we see the GCV score with 3 DOF penalty decrease to a local minimum and then increases. However, there is a point where the penalty is very close to 1, so the denominator of the GCV score goes to zero causing the GCV score to blow up. Beyond this point (n_feautres = 30), the modified GCV score is negative which is meaningless to us. If we restrict the evaluation to resonably small values of number of basis functions, (less than 30 for example), the modified GCV score gives useful results.
+
+#### f) 
+```{r}
+max_n_features = 20;
+best_n_features = 0;
+dof_charge = 3;
+best_score = Inf;
+best_coef_vector = c();
+X = truncated.power.design.matrix()
+for (nterm in 1:max_n_features) {
+  coef_vector = regsubsets.fitted.values(X, y1, nterm, "forward")
+  score = (sum(((X %*% coef_vector) - y1) ^ 2) / length(y1)) / (1 - (
+    dof_charge * (nterm / length(y1))));
+  if (score < best_score) {
+    best_score = score;
+    best_n_features = nterm;
+    best_coef_vector = coef_vector;
+  }
+}
+paste0('Best N Features for forward selection: ', best_n_features);
+
+predict <- function(to_predict) {
+  design.matrix = matrix(0, ncol=length(x), nrow=length(to_predict));
+  design.matrix[, length(x)] = 1;
+  for (i in 1:length(x) - 1) {
+    design.matrix[to_predict > x[i], i] = (to_predict[to_predict > x[i]] - x[i])
+  }
+  return (design.matrix %*% best_coef_vector);
+}
+vals_to_try = seq(0, 2 * pi, .001)
+plot(x, predict(x), ylab = 'Predicted Value', 
+     xlab = 'X', main=paste0('Optimal Forward Selection Model with ', 
+                             best_n_features, ' features'))
+
+## backward selection ##
+max_n_features = 20;
+best_n_features = 0;
+dof_charge = 3;
+best_score = Inf;
+best_coef_vector = c();
+X = truncated.power.design.matrix()
+for (nterm in 1:max_n_features) {
+  coef_vector = regsubsets.fitted.values(X, y1, nterm, "backward")
+  score = (sum(((X %*% coef_vector) - y1) ^ 2) / length(y1)) / (
+    1 - (dof_charge * (nterm / length(y1))));
+  if (score < best_score) {
+    best_score = score;
+    best_n_features = nterm;
+    best_coef_vector = coef_vector;
+  }
+}
+paste0('Best N Features for backward selection: ', best_n_features);
+
+predict <- function(to_predict) {
+  design.matrix = matrix(0, ncol=length(x), nrow=length(to_predict));
+  design.matrix[, length(x)] = 1;
+  for (i in 1:length(x) - 1) {
+    design.matrix[to_predict > x[i], i] = (to_predict[to_predict > x[i]] - x[i])
+  }
+  return (design.matrix %*% best_coef_vector);
+}
+vals_to_try = seq(0, 2 * pi, .001)
+plot(x, predict(x), ylab = 'Predicted Value', xlab = 'X', 
+     main=paste0('Optimal Backward Selection Model with ', best_n_features, ' features'))
+```
+
+We restrict the number of basis functions to less than or equal to 20. Forward selection gives us a good estimate of the sine function. However, since the modified GCV score behaves strangely above 30 basis functions, using reverse selection gives poor results. The model selected with forward selection is much closer to the truth than the model selected with backward selection. 
+
+
+#### g)
+```{r}
+X = truncated.power.design.matrix();
+U = eigen(t(X) %*% X)$vectors;
+Gamma = eigen(t(X) %*% X)$values;
+X_tilda = X %*% U;
+A = lm(y1 ~ X_tilda - 1)$coefficients;
+sigma = 0.4;
+shrinkage = Gamma / (Gamma + ((sigma ^ 2) / (A ^ 2)));
+shrunk_A = A * shrinkage;
+
+plot(x, X_tilda %*% shrunk_A, ylab = 'Predicted Value', xlab = 'X',
+     main=paste0('Shrinkage Parameters from Noisy Data'))
+```
+
+The model is very noisy when the estimated regression coefficients are used. Not enough shrinkage of the parameters occured, likely because the estimated A coefficient vector has values that are too large, as they are fitting to the noise. 
+
+
+#### h) 
+```{r}
+X = truncated.power.design.matrix();
+U = eigen(t(X) %*% X)$vectors;
+Gamma = eigen(t(X) %*% X)$values;
+X_tilda = X %*% U;
+A_True = lm(sin(x) ~ X_tilda - 1)$coefficients;
+A = lm(y1 ~ X_tilda - 1)$coefficients;
+sigma = 0.4;
+shrinkage = Gamma / (Gamma + ((sigma ^ 2) / (A_True ^ 2)));
+shrunk_A = A * shrinkage;
+
+plot(x, X_tilda %*% shrunk_A, ylab = 'Predicted Value', xlab = 'X', 
+     main=paste0('Shrinkage Parameters from True Data'))
+```
+
+The shrinkage coefficients calculated on the true data give the optimal shrinkage coefficients. These are much larger than above, becauset the True Ai's are much smaller than the estimated Ai's on the noisy data. When these shrinkage coefficients are applied to noisy data, we get an almost perfect sine curve. 
+
+#### i)
+```{r}
+X = truncated.power.design.matrix();
+U = eigen(t(X) %*% X)$vectors;
+Gamma = eigen(t(X) %*% X)$values;
+X_tilda = X %*% U;
+A = lm(y1 ~ X_tilda - 1)$coefficients;
+sigma = 0.4;
+z_crit = 3;
+sigma_est = sum((y1[2:100] - y1[1:99])^2) / 98;
+A_standardized_true_sigma = A * (sqrt(Gamma) / sigma);
+A_standardized_est_sigma = A * (sqrt(Gamma) / sigma_est);
+A_softshrink_true_sigma = rep(0, length(x));
+A_hardshrink_true_sigma = rep(0, length(x));
+A_softshrink_est_sigma = rep(0, length(x));
+A_hardshrink_est_sigma = rep(0, length(x));
+for (i in 1:length(x)) {
+  if (abs(A_standardized_true_sigma[i]) > z_crit) {
+    A_softshrink_true_sigma[i] = (
+      abs(A_standardized_true_sigma[i]) - z_crit) * sign(A_standardized_true_sigma[i]);
+    A_hardshrink_true_sigma[i] = A_standardized_true_sigma[i];
+  }
+  if (abs(A_standardized_est_sigma[i]) > z_crit) {
+    A_softshrink_est_sigma[i] = (
+      abs(A_standardized_est_sigma[i]) - z_crit) * sign(A_standardized_est_sigma[i]);
+    A_hardshrink_est_sigma[i] = A_standardized_est_sigma[i];
+  }
+}
+# unstandardize
+A_hardshrink_est_sigma = A_hardshrink_est_sigma * (sigma_est / sqrt(Gamma));
+A_hardshrink_true_sigma = A_hardshrink_true_sigma * (sigma_est / sqrt(Gamma));
+A_softshrink_est_sigma = A_softshrink_est_sigma * (sigma_est / sqrt(Gamma));
+A_softshrink_true_sigma = A_softshrink_true_sigma * (sigma_est / sqrt(Gamma));
+plot(x, X_tilda %*% A_softshrink_est_sigma, 
+     ylab = 'Predicted Value', xlab = 'X', main=paste0('Softshrink; Estimated Sigma'));
+plot(x, X_tilda %*% A_hardshrink_est_sigma,
+     ylab = 'Predicted Value', xlab = 'X', main=paste0('Hardshrink; Estimated Sigma'));
+
+plot(x, X_tilda %*% A_softshrink_true_sigma,
+     ylab = 'Predicted Value', xlab = 'X', main=paste0('Softshrink; True Sigma'));
+plot(x, X_tilda %*% A_hardshrink_true_sigma, 
+     ylab = 'Predicted Value', xlab = 'X', main=paste0('Hardshrink; True Sigma'));
+```
+
+Even when the estimated sigma is used, both the softshrink parameters give much better results than any of the other methods attempted above in which the true sigma and true y vs x relationship was not used. The hardshrink parameters are very noisy, as they are not shrinking the parameters enough. Both hardshrink and softshrink using the true sigma produce nearly perfect sine waves.
+
+
