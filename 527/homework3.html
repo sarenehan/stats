@@ -239,6 +239,13 @@ abline(lm(y~x))</code></pre>
 </div>
 <div id="c" class="section level4">
 <h4>c)</h4>
+<p>Plugging in the value of N to the Reinsch form and multiplying by <span class="math inline">\(I = X X^{-1}\)</span> on the left and <span class="math inline">\(I = X^{-T} X^T\)</span> gives:</p>
+<p><span class="math display">\[(I + \lambda X^{-T} \Omega  X^{-1})^{-1} = X X^{-1} ( I + \lambda X^{-T} \Omega X^ {-1})^{-1} X^{-T} X^T\]</span></p>
+<p><span class="math display">\[ = X(X^T (I + \lambda X^{-T} \Omega X^{-1}) X)^{-1} X^T\]</span></p>
+<p><span class="math display">\[ = X(X^TX + \lambda X^T X^{-T} \Omega X^{-1} X )^{-1} X^T\]</span></p>
+<p>On the right side of the inverse, the <span class="math inline">\(X^T X^{-T}\)</span> and <span class="math inline">\(X^{-1} X\)</span> both equal the identity, reducing the equation to:</p>
+<p><span class="math display">\[ X (X^T X + \lambda \Omega)^{-1} X^T = S_\lambda\]</span></p>
+<p>Which is the same as above.</p>
 </div>
 
 

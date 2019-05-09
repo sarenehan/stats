@@ -60,4 +60,17 @@ abline(lm(y~x))
 The line for $\lambda = 10^6$ is equal to the regression line, as shown above.
 
 #### c)
-https://stats.stackexchange.com/questions/324642/invertibility-in-reinsch-form-derivation-smoothing-splines
+Plugging in the value of N to the Reinsch form and multiplying by $I = X X^{-1}$ on the left and $I = X^{-T} X^T$ gives:
+
+$$(I + \lambda X^{-T} \Omega  X^{-1})^{-1} = X X^{-1} ( I + \lambda X^{-T} \Omega X^ {-1})^{-1} X^{-T} X^T$$
+
+$$ = X(X^T (I + \lambda X^{-T} \Omega X^{-1}) X)^{-1} X^T$$
+
+$$ = X(X^TX + \lambda X^T X^{-T} \Omega X^{-1} X )^{-1} X^T$$
+
+On the right side of the inverse, the $X^T X^{-T}$ and $X^{-1} X$ both equal the identity, reducing the equation to:
+
+$$ X (X^T X + \lambda \Omega)^{-1} X^T = S_\lambda$$
+
+Which is the same as above.
+
