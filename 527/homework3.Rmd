@@ -74,3 +74,31 @@ $$ X (X^T X + \lambda \Omega)^{-1} X^T = S_\lambda$$
 
 Which is the same as above.
 
+#### d) 
+
+$$cov(y, \hat{y}) = cov(y, S_\lambda y)$$
+$$ = S_\lambda cov(y, y)$$
+$$= S_\lambda \sigma ^2 $$
+$$=> \sum{cov(y, \hat{y}}) = \sigma^2\sum{S_\lambda} = \sigma^2 tr(S_\lambda) = p \sigma^2$$
+
+#### e)
+
+$$S_\lambda = (I + \lambda N)^{-1} = (I + \lambda U D U^T)^{-1}$$
+
+$$=UU^{-1}(I + \lambda UDU^T)^{-1}U^{-T}U^T$$
+$$=U(U^T(I + \lambda UDU^T)U)^{-1}U^T$$
+
+$$=U(U^TIU + \lambda U^TUDU^TU)^{-1}U^T$$
+$$=U(I + \lambda D)^{-1}U^T$$
+
+
+
+
+
+
+
+
+
+
+
+
