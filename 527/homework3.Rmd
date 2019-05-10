@@ -2,7 +2,7 @@
 title: "Homework 3"
 author: "Stewart Renehan"
 date: "5/8/2019"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -59,6 +59,8 @@ abline(lm(y~x))
 
 The line for $\lambda = 10^6$ is equal to the regression line, as shown above.
 
+
+  
 #### c)
 Plugging in the value of N to the Reinsch form and multiplying by $I = X X^{-1}$ on the left and $I = X^{-T} X^T$ gives:
 
@@ -74,6 +76,8 @@ $$ X (X^T X + \lambda \Omega)^{-1} X^T = S_\lambda$$
 
 Which is the same as above.
 
+
+  
 #### d) 
 
 $$cov(y, \hat{y}) = cov(y, S_\lambda y)$$
@@ -90,6 +94,35 @@ $$=U(U^T(I + \lambda UDU^T)U)^{-1}U^T$$
 
 $$=U(U^TIU + \lambda U^TUDU^TU)^{-1}U^T$$
 $$=U(I + \lambda D)^{-1}U^T$$
+  
+#### f) 
+
+```{r}
+X = truncated.power.design.matrix();
+Omega = diag(length(x));
+Omega[1, 1] = 0;
+Omega[length(x), length(x)] = 0;
+N = ginv(t(X)) %*% Omega %*% ginv(X);
+U = eigen(N)$vectors;
+plot(x, (N %*% U)[,1], main='Least Shrinkage')
+plot(x, (N %*% U)[,2], main='Second Least Shrinkage')
+plot(x, (N %*% U)[,3], main='Third Least Shrinkage')
+plot(x, (N %*% U)[,4], main='Fourth Least Shrinkage')
+
+plot(x, (N %*% U)[,100], main='Most Shrinkage')
+plot(x, (N %*% U)[,99], main='Second Most Shrinkage')
+plot(x, (N %*% U)[,98], main='Third Most Shrinkage')
+plot(x, (N %*% U)[,97], main='Fourth Most Shrinkage')
+```
+
+We see that the eigenvectors correspond to various frequencies of standing waves. So, we are essentially performing a fourier transform of the data onto various sine wave frequencies. 
+
+#### g) 
+The trace is invariant under permutations, so
+
+$$tr(U^T (I + \lambda D)^{-1} U) = tr(U^T U (I + \lambda D)^{-1}) = tr(I (I + \lambda D)^{-1}))$$
+
+$$ = tr(I + \lambda D)^{-1}) = \sum_{i}(I + \lambda D_{ii})^{-1}$$
 
 
 
