@@ -1,5 +1,16 @@
-# 1
+---
+title: "homework4"
+author: "Stewart Renehan"
+date: "5/29/2019"
+output: pdf_document
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1
+```{r}
 source('/Users/stewart/projects/stats/527/meatspec-train-test.R')
 resubstitution_error = mean((lm(fat~., data = train)$fitted.values - train$fat)^2)
 print(paste0('Average squared resubstitution error ', resubstitution_error))
@@ -15,8 +26,12 @@ print(paste0('CV Estimated average squared resubstitution error ', cv_estimate))
 
 test_error = mean((predict(lm(fat~., data = train), test[,1:100]) - test$fat) ^ 2)
 print(paste0('Test Error ', test_error))
+```
 
-# 2 
+
+### 2
+#### a)
+```{r}
 require('leaps')
 forward.select.features <- function(X, Y, nterm, selection_method="forward") {
   features = summary(
@@ -62,27 +77,45 @@ for (n_features in 1:50) {
  
 plot(1:50, cv_errors[1:50], main='CV Error vs N Features', ylab='CV Error', xlab='N Features') 
 plot(3:50, cv_errors[3:50], main='CV Error vs N Features (3 or more features)', ylab='CV Error', xlab='N Features') 
+```
+
+#### b)
+
+```{r}
 print(paste0('Estimate for optimal number of features: ', best_n_features));
 features = forward.select.features(train_[,1:50], train_$fat, best_n_features)
 mse_train = mean((lm(paste0('fat ~ ', paste(features, collapse='+')), train_)$fitted.values - train_$fat) ^2 )
 print(paste0('Resubstitution Error for optimal number of features: ', mse_train))
 mse_test = mean((predict(lm(paste0('fat ~ ', paste(features, collapse='+')), train_), test_) - test_$fat) ^2 )
 print(paste0('Test Error for optimal number of features: ', mse_test))
+```
 
-# 3 
-install.packages('pls')
+### 3
+
+#### a) 
+```{r}
+# install.packages('pls')
 require(pls)
 pc_regression = pcr(fat~., 100, data=train, validation = 'CV', segments=5, )
-opt.n.features = which.min(pc_regression$validation$PRESS)
-print(paste0('Optimal Number of components: ', opt.n.features,  ' components'))
 validationplot(pc_regression, val.type='MSEP', ylab='MSE', main='PC Regression CV Error vs N Components')
-test_preds = predict(pc_regression, newdata = test)[1:100, 1, 24]
+```
+
+#### b) 
+```{r}
+opt.n.features = which.min(pc_regression$validation$PRESS)
+print(paste0('Optimal Number of components kopt: ', opt.n.features,  ' components'))
+train_preds = pc_regression$fitted.values[1:nrow(train), 1, opt.n.features]
+test_preds = predict(pc_regression, newdata = test)[1:100, 1, opt.n.features]
 test_mse = mean((test_preds - test$fat) ^2)
+train_mse = mean((train_preds - train$fat) ^2)
 print(paste0("Test MSE: ", test_mse))
+print(paste0("Train MSE: ", train_mse))
+```
 
-
-# 4 
-install.packages('matrixStats')
+### 4 
+#### a) 
+```{r}
+# install.packages('matrixStats')
 library(matrixStats)
 colmeans = as.vector(colMeans(train[,1:100]));
 colstdevs = colSds(as.matrix(train[,1:100]));
@@ -125,8 +158,11 @@ plot(log(lambdas, base=10), cv_errors, ylab='CV MSE', main='CV(lambda)');
 plot(log(lambdas, base=10), gcv_errors, ylab='GCV MSE', main='GCV(lambda)');
 print(paste0('Best CV Lambda: ', best_cv_lambda));
 print(paste0('Best GCV Lambda: ', best_gcv_lambda));
+```
 
-# b 
+#### b) 
+
+```{r}
 gcv.coef = ginv((t(X) %*% X) + best_gcv_lambda * I) %*% t(X) %*% y;
 cv.coef = ginv((t(X) %*% X) + best_cv_lambda * I) %*% t(X) %*% y;
 
@@ -148,15 +184,18 @@ print(paste0('GCV Estimate of Prediction Error for CV Optimal Lambda: ', gcv.cv.
 
 print(paste0('CV Optmial Lambda test error ', cv.test.error));
 print(paste0('GCV Optmial Lambda test error ', gcv.test.error));
+```
 
-# c
+#### c) 
 
+```{r}
 plot(1:100, cv.coef[2:101], xlab='Frequency Index', ylab='Coefficient', main='CV Optimal Lambda Coefficients')
 plot(1:100, gcv.coef[2:101], xlab='Frequency Index', ylab='Coefficient', main='GCV Optimal Lambda Coefficients')
+```
 
-
-## 5 ##
-# a
+### 5 
+#### a) 
+```{r}
 I_ = diag(ncol(train.normalized));
 I_[1, 1] = 0;
 I_[nrow(I_), nrow(I_)] = 0;
@@ -182,8 +221,10 @@ for (lambda in lambdas) {
 
 plot(log(lambdas, base=10), gcv_errors, ylab='GCV MSE', main='GCV(lambda)');
 print(paste0('Best CV Lambda: ', best_cv_lambda));
+```
 
-# b 
+#### b) 
+```{r}
 gcv.coef = ginv((t(X) %*% X) + best_gcv_lambda * (t(I_) %*% I)) %*% t(X) %*% y;
 gcv.resub = mean((X%*% gcv.coef - train$fat)^2);
 gcv.test.error = mean((X.test%*% gcv.coef - test$fat)^2);
@@ -194,5 +235,27 @@ print(paste0('GCV Estimate of Prediction Error for GCV Optimal Lambda: ', gcv.cv
 
 print(paste0('GCV Optmial Lambda test error ', gcv.test.error));
 
-# c 
+```
+
+#### c)
+```{r}
 plot(1:100, gcv.coef[2:101], xlab='Frequency Index', ylab='Coefficient', main='GCV With Smootheness Penalty Optimal Lambda Coefficients')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
