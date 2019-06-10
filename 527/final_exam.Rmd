@@ -1,0 +1,105 @@
+---
+title: "final_exam"
+author: "Stewart Renehan"
+date: "6/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 
+
+#### a)
+The marginal distribution of x is a uniform distribution with probability 1/4 in the range {-4, -2}, and a uniform distribution with probability 1/4 in the range {2, 4}, with probability 0 everywhere else. 
+
+
+#### b)
+The bayes rule is
+$$f_b(x) = \{1\ if\ -4 < x < -2;\ 2\ if\ 2 < x < 4\}$$
+
+The risk is 0 because there is 0 probability of y = 2 occuring when x is between -4 and -2, and 0 probability of y = 1 occuring if x is between 2 and 4, and 0 probability of observing x outside of these two ranges. 
+
+#### c)
+If there is at least one observation in each bin, the risk is 0 because when the observed x is -2, the closest possible observation to the y=2 region, the furthest possible training data for the y=1 region is 2 points away, while the closest possible observation for the y = 2 region (which would result in an incorrect prediction) is 4 points away. So, as long as there is at least one trainig data point for y = 1 and at least one training data point for y =2, there is 0 probability of an incorrect prediction.  
+  
+However, when there are zero training data points in one bin, the risk is nonzero. It is equivalent to the probability of obtaining zero training points in one bin = $(\frac{1}{2})^{n-1}$ times the probability of the test value being in the opposite bin = 1/2.  
+  
+Thus, the total risk is $(\frac{1}{2})^n$.
+
+  
+
+#### d)
+By the same argument in part (c), if there are 3 or more training observations in each bin, then the expected risk is zero. Again, but the same argument in part (c), if there are 0 observations in one bin, then the risk is $(\frac{1}{2})^{n+1}$. If there is only two observations in one of the bins, then the risk is zero because by majority vote, 2/3 of the closest observations will be of the correct class. However, if one of the bins has only one observation, then the observations in that bin will get the incorrect prediction because 2 of the 3 closest neighbors are in the other bin. So in this situation, the risk is the probability of one of the bins having exactly one observation. This is equal to 2, the number of bins, times the probability of one bin getting oen observation, which is $n (\frac{1}{2})^n$, where the $n$ factor accounts for the fact that there are $n$ possible timings of the draw for the bin with 1 observation. This is multiplied by the probability of the prediction being for the bin with only one observation which is 1/2. So, the risk for the case where the one of the bins only has one observation is $n (\frac{1}{2})^n$. 
+  
+The total risk is the sum of the two cases, $(n+1)(\frac{1}{2})^n$
+
+  
+#### e)
+The one nearest neighbor method has lower risk because misclassifications only happen when one bin has 0 training observations, while the 3 nearest neighbor has misclassifications when one bin has 0 or 1 training observations.
+
+
+## 2
+#### a) 
+```{r}
+spam.data = read.table('/Users/stewart/Downloads/spam.data')
+traintest = read.table('/Users/stewart/Downloads/spam.traintest')
+
+test = spam.data[traintest== 1,]
+train = spam.data[traintest==0,]
+# install.packages('rpart')
+require(rpart)
+# help(rpart)
+model = rpart(V58~., data = train, method="class", cp=0, minsplit=0)
+plot(model)
+print('Cant print the names of the splits, there are too many!')
+# text(model)
+
+train.error = sum((predict(model, train)[,1] == 0) != train$V58) / nrow(train)
+test.error = sum((predict(model, test)[,1] == 0) != test$V58) / nrow(test)
+print(paste0('Train Error Rate: ', train.error));
+print(paste0('Test Error Rate: ', test.error));
+```
+
+#### b)
+```{r}
+folds <- cut(sample(seq(1,nrow(train))),breaks=10,labels=FALSE)
+ct.tests = c(0, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1);
+errors = c();
+for (lambda in ct.tests) {
+  val.errors = c();
+  for (fold in 1:10) {
+    model =  rpart(V58~., data = train[folds !=fold,], method='class', cp=lambda, minsplit=0);
+    val.error = sum((predict(model, train[fold == fold,])[,1] == 0) != train[fold == fold,]$V58) / nrow(train[fold == fold,]);
+    val.errors = c(val.errors, val.error);
+  } 
+  errors = c(errors, mean(val.errors))
+  print(mean(val.errors))
+}
+plot(log(ct.tests, base=10), errors, ylab='CV Misclassification Error', main='CV(lambda)');
+print(paste0('Optimal lambda', 0.0001))
+model.optimal = rpart(V58~., data = train, method='class', cp=0.0001, minsplit=0)
+plot(model.optimal)
+train.error = sum((predict(model.optimal, train)[,1] == 0) != train$V58) / nrow(train)
+test.error = sum((predict(model.optimal, test)[,1] == 0) != test$V58) / nrow(test) 
+print(paste0('Train Error Rate: ', train.error));
+print(paste0('Test Error Rate: ', test.error));
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
