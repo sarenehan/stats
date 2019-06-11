@@ -39,6 +39,62 @@ test.error = sum((predict(model.optimal, test)[,1] == 0) != test$V58) / nrow(tes
 print(paste0('Train Error Rate: ', train.error));
 print(paste0('Test Error Rate: ', test.error));
 
+## 3
+require(glmnet)
+
+model = cv.glmnet(as.matrix(train[,1:57]), train$V58, nfolds=10, alpha=0, lambda.min.ratio=0)
+print(paste0('Optimal Lambda: ', model$lambda.1se))
+
+preds = predict(model, as.matrix(train[,1:57]), s="lambda.1se")
+
+best.c <- 0
+best.error <- 'inf'
+for (pred in preds) {
+  err = (sum((preds > pred) != train$V58));
+  if (pred < best.error) {
+    best.error = err;
+    best.c = pred;
+  } 
+}
+print(paste0('Optimal value for C: ', best.c))
+
+train.error = best.error / nrow(train);
+test.error =sum((predict(model, newx=as.matrix(test[,1:57]), s="lambda.1se") > best.c) != test$V58) / nrow(test)
+print(paste0('Resubstitution Error on Training Data ', train.error))
+print(paste0('Resubstitution Error on Testing Data ', test.error))
+
+ls.model = lm('V58~.', data=train)
+preds = predict(ls.model, data=train)
+best.c <- 0
+best.error <- 'inf'
+for (pred in preds) {
+  err = (sum((preds > pred) != train$V58));
+  if (pred < best.error) {
+    best.error = err;
+    best.c = pred;
+  } 
+}
+print(paste0('Optimal value for C for least squares model: ', best.c))
+train.error = best.error / nrow(train);
+test.error = sum((predict(ls.model, newdata=test) > best.c) != test$V58) / nrow(test)
+print(paste0('Least Squares Resubstitution Error on Training Data ', train.error))
+print(paste0('Least Squares Resubstitution Error on Testing Data ', test.error))
+
+# 4 
+# a)
+# install.packages('ISLR')
+require('ISLR')
+data('College')
+sample <- sample.int(n = nrow(College), size = floor(.8*nrow(College)), replace = F)
+train <- College[sample, ]
+test  <- College[-sample, ]
+
+require('leaps')
+regsubsets(Outstate~., data=train, method='forward')
+
+
+
+
 
 
 
