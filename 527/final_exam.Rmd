@@ -135,10 +135,63 @@ Ridge regression outperforms least squares on the testing data by about 2%.
 
 
 ## 4
-3 + 3
+#### a)
+```{r}
+# require('ISLR')
+# data('College')
+sample <- sample.int(n = nrow(College), size = floor(.8*nrow(College)), replace = F)
+train <- College[sample, ]
+test  <- College[-sample, ]
+
+require('leaps')
+
+folds <- cut(sample(seq(1,nrow(train))),breaks=10,labels=FALSE)
+best.n.features = 0;
+best.error = 'inf'
+possible_features = c();
+for (name in names(train)) {
+  if (name != 'Outstate') {
+    possible_features = c(possible_features, name);
+  }
+}
+
+for (n_features in 1:(ncol(train) - 1)) {
+  errors = c();
+  for (fold in 1:10) {
+    optimal_features = summary(
+      regsubsets(Outstate~., data=train[folds != fold,], method='forward', nvmax=n_features, intercept = F)
+    )$which[n_features,];
+    model = lm(as.formula(paste("Outstate~", paste(possible_features[optimal_features], collapse="+"))), data=train[folds != fold,]);
+    preds = predict(model, newdata=train[folds == fold,]) 
+    mse = mean((preds - train[folds == fold, 'Outstate'])^2)
+    errors= c(errors, mse);
+  }
+  if (mean(errors) < best.error) {
+    best.error = mean(errors);
+    best.n.features = n_features;
+  }
+}
+print(paste0('Best n features using forward selection w/ 10 fold cv: ', best.n.features));
+optimal_features = summary(
+  regsubsets(Outstate~., data=train, method='forward', nvmax=best.n.features, intercept = F)
+)$which[best.n.features,];
+print('Optimal features: ')
+print(possible_features[optimal_features])
+```
 
 
+#### b)
+```{r}
+model = lm(as.formula(paste("Outstate~", paste(possible_features[optimal_features], collapse="+"))), data=train);
 
+plot(predict(model, train), train$Outstate, xlab = 'Prediction', ylab='Truth', main='Predictions vs Truth')
+```
+
+#### c) 
+```{r}
+rmse = mean((predict(model, test) - test$Outstate)^2) ^.5
+print(paste0('On the test data, the RMSE is ', rmse, ' so the predictions are usually within this far of the true on testing data.'))
+```
 
 
 
