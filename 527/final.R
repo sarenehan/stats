@@ -133,3 +133,96 @@ plot(predict(model, train), train$Outstate, xlab = 'Prediction', ylab='Truth', m
 # c
 rmse = mean((predict(model, test) - test$Outstate)^2) ^.5
 print(paste0('On the test data, the RMSE is ', rmse, ' so the predictions are usually within this far of the true on testing data.'))
+
+
+### 6
+# a)
+K = 10;
+knn.classifier <- function(X.train, y.train, X.test, k.try = 1, pi = rep(1/K,K), CV = F){
+  classes = sort(unique(y.train));
+  X.train = as.matrix(X.train);
+  X.test = as.matrix(X.test);
+  n.is = c();
+  for (class in classes) {
+    n.is = c(n.is, sum(y.train == class));
+  }
+  output = matrix(nrow=nrow(X.test), ncol=length(k.try));
+  for (row.test in 1:(nrow(X.test))) {
+    print(row.test);
+    distances = rowSums(sweep(X.train, 2, as.vector(X.test[row.test,])) ^ 2)
+    if (CV == T) {
+      distances[row.test] = max(distances);
+    }
+    preds = y.train[sort(distances, index.return=TRUE)$ix];
+    for (k.try.idx in 1:length(k.try)) {
+      knns = preds[1:k.try[k.try.idx]];
+      max.n.occurences = 0;
+      best.prediction = -1;
+      for (pred in unique(knns)) {
+        pred.idx = match(pred, classes)
+        n_occurences = sum(knns == pred) * pi[pred.idx] / n.is[pred.idx];
+        if (n_occurences > max.n.occurences) {
+          best.prediction = pred;
+          max.n.occurences = n_occurences;
+        }
+      }
+      output[row.test, k.try.idx] = best.prediction;
+    }
+  }
+  return(output);
+}
+
+# b
+library(datasets);
+data(iris);
+X.train = iris[,names(iris) != 'Species']
+X.test = X.train
+y.train = iris$Species
+K = length(unique(y.train))
+pi = c();
+for (cls in sort(unique(y.train))) {
+  pi = c(pi, sum(y.train == cls) / nrow(iris));
+}
+knn.nocv = knn.classifier(X.train, y.train, X.test, k.try = 5, pi = pi, CV = F);
+knn.cv = knn.classifier(X.train, y.train, X.test, k.try = 1, pi = pi, CV = T);
+
+print(paste0('Iris No CV misclassifications (out of 150 predictions): ', sum(knn.nocv != y.train)))
+print(paste0('Iris CV misclassifications (out of 150 predictions): ', sum(knn.cv != y.train)))
+
+# c
+k.try = c(1, 3, 7, 11, 15, 21, 27, 35, 43);
+train = read.table('/Users/stewart/Downloads/zip-train.dat');
+X.train = train[,2:257]
+X.test = X.train
+y.train = train[,1]
+pi = c();
+for (cls in sort(unique(y.train))) {
+  pi = c(pi, sum(y.train == cls) / nrow(train));
+}
+knn.out = knn.classifier(X.train, y.train, X.test, k.try = k.try, pi = pi, CV = T);
+
+best.k = 0;
+best.error = nrow(X.train);
+for (k.idx in 1:length(k.try)) {
+  preds = knn.out[,k.idx];
+  n_errors = sum(preds != y.train);
+  print(paste0('N errors for k = ', k.try[k.idx], ': ', n_errors));
+  if (n_errors < best.error) {
+    best.k = k.try[k.idx];
+    best.error = n_errors;
+  }
+}
+print(paste0('Optimal k: ', best.k));
+#d 
+test = read.table('/Users/stewart/Downloads/zip-test.dat')
+test.preds = knn.classifier(X.train, y.train, test[,2:257], k.try=best.k, pi=pi, CV=F);
+
+test.error = sum(test.preds != test[, 1]) / nrow(test);
+print(paste0('Estimated Test Error Rate ', test.error));
+
+
+###
+sub = matrix(as.vector(X.train[1,]),nrow=nrow(X.train),ncol=length(v),byrow=TRUE)
+library(dplyr)
+diff = setdiff(as.matrix(X.train), sub)
+
