@@ -137,8 +137,8 @@ Ridge regression outperforms least squares on the testing data by about 2%.
 ## 4
 #### a)
 ```{r}
-# require('ISLR')
-# data('College')
+require('ISLR')
+data('College')
 sample <- sample.int(n = nrow(College), size = floor(.8*nrow(College)), replace = F)
 train <- College[sample, ]
 test  <- College[-sample, ]
@@ -194,7 +194,11 @@ print(paste0('On the test data, the RMSE is ', rmse, ' so the predictions are us
 ```
 
 
+## 5
+![](/Users/stewart/Desktop/problem_5.png)
 
+
+## 6
 
 
 
